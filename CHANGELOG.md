@@ -2,6 +2,11 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.3] - 2026-11-25
+
+### Changed
+- **Quests are picked up and handed in on the way.** If a quest giver or hand-in is no more than about 80 yards out of your way to the current step, you stop there first, nearest first, and the guide window says "On your way to: ...". This includes quests from much later in your guide's list, so you don't walk past a quest giver now and come back for them later. It doesn't happen for a step you've chosen yourself on the Steps screen, or for side quests the Story guide skips. Guides can change the distance with the new `onTheWay` rule (0 turns it off).
+
 ## [0.9.2] - 2026-11-21
 
 ### Fixed

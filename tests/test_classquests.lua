@@ -48,7 +48,8 @@ return {
         db.Quest[106].startedBy = { { 1003 } } -- giver in The Barrens
         db.Quest[106].requiredLevel = 8
         local state = fixtures.login(ns)
-        T.truthy(hasQuest(state.steps[1], 106), "first step: " .. tostring(state.steps[1] and state.steps[1].title))
+        local heading = fixtures.heading(state)
+        T.truthy(hasQuest(heading, 106), "heading for: " .. tostring(heading and heading.title))
     end },
 
     { "a guide's quest list doesn't hide class quests", function(T)
@@ -58,10 +59,12 @@ return {
         QuestwalkerDB.guides["custom-list"] = {
             format = "Questwalker guide", version = 2, name = "Just Peons", basedOn = "efficient",
             quests = { { id = 102 } }, skipQuests = { 106 },
+            bands = { { levels = { 1, 60 }, zones = { "Durotar" } } },
         }
         ns.Library.Init()
         QuestwalkerCharDB.routeId = "custom-list"
         local state = fixtures.login(ns)
+        T.eq(ns.Library.Get("custom-list").name, "Just Peons", "the guide loaded")
         T.truthy(acceptFor(state, 106), "not in the list, and in skipQuests")
     end },
 

@@ -147,6 +147,7 @@ optional.
   | `maxDetour` | Skip quests whose giver is more than this many yards out of the way (0 = no limit) | 350 | 0 |
   | `minRate` | Drop quests giving less than this % of the usual XP for the time they take | 50 | 0 |
   | `rateBonus` | Preference for quests with good XP for the time they take | 250 | 0 |
+  | `onTheWay` | Pick up or hand in quests you pass if they add no more than this many yards (0 = off) | 80 | 80 |
 
 The `|` character isn't allowed in text, and it's replaced with `/`. Imported guides are only data and never run
 as code, so they're safe to share.

@@ -132,8 +132,11 @@ return {
         local id = save(ns)
         ns.MainFrame.SetRoute(id)
         -- 101 (Zureetha, 50 yd) is first in the list, so it beats the
-        -- nearer Foreman (20 yd, quest 102, second in the list).
-        T.eq(ns.Engine.state.steps[1].title, "Talk to Zureetha Fargaze")
+        -- nearer Foreman (20 yd, quest 102, second in the list)...
+        T.eq(fixtures.heading(ns.Engine.state).title, "Talk to Zureetha Fargaze")
+        -- ...and the Foreman is on the way, so 102 is picked up first.
+        T.eq(ns.Engine.state.steps[1].title, "Talk to Foreman Thazz'ril")
+        T.eq(ns.Engine.state.steps[1].onTheWayTo, fixtures.heading(ns.Engine.state).key)
     end },
 
     { "reordering the list changes what comes first", function(T)
@@ -369,13 +372,19 @@ return {
         local ns = setup(T)
         local id = save(ns)
         ns.MainFrame.SetRoute(id)
-        T.eq(ns.Engine.state.steps[1].title, "Talk to Zureetha Fargaze")
+        -- Where you're heading (quick stops on the way may come first).
+        local function heading()
+            for _, s in ipairs(ns.Engine.state.steps) do
+                if not s.onTheWayTo then return s.title end
+            end
+        end
+        T.eq(heading(), "Talk to Zureetha Fargaze")
         ns.LibraryTab.Select(id)
         ns.LibraryTab.Press("edit")
         ns.GuideEditor.SelectQuest(2)
         ns.GuideEditor.PressMove(1) -- 102 to the top
         ns.GuideEditor.Save()
-        T.eq(ns.Engine.state.steps[1].title, "Talk to Foreman Thazz'ril")
+        T.eq(heading(), "Talk to Foreman Thazz'ril")
     end },
 
     { "the editor's message list is capped", function(T)

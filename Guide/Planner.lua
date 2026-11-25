@@ -51,6 +51,8 @@ function Planner.Merge(steps)
             -- A merged step is as attractive as its best part.
             existing.bonus = math.max(existing.bonus or 0, step.bonus or 0)
             existing.target = existing.target or step.target
+            -- Only "pass by" when every part is.
+            if not step.passBy then existing.passBy = nil end
         else
             local copy = {}
             for k, v in pairs(step) do copy[k] = v end
@@ -199,6 +201,57 @@ function Planner.Order(origin, steps, pinnedKey, limit)
         take(bestIndex)
     end
     return ordered
+end
+
+-- Quick stops worth making on the way: they take seconds once you're there.
+local QUICK_KINDS = { ACCEPT = true, TURNIN = true }
+Planner.ON_THE_WAY_MAX = 4
+
+--- Pick up and hand in quests on the way to the current step. Any quick
+--- stop (an ACCEPT or TURNIN from the candidates) that adds at most
+--- `maxDetour` yards to the walk there, and is nearer than the step, goes
+--- first, nearest first. They're marked onTheWayTo = the step's key, so
+--- the step stays the one being walked to.
+-- @param ordered the route from Planner.Order (its first step is where you're heading)
+-- @param pool    every candidate step (merged), so pickups planned for much later count
+function Planner.AddOnTheWay(origin, ordered, pool, maxDetour, limit)
+    local dest = ordered[1]
+    local to = dest and dest.target and dest.target.world
+    if not (origin and to and maxDetour and maxDetour > 0) or origin.continent ~= to.continent then
+        return ordered
+    end
+    if QUICK_KINDS[dest.kind] and dest.onTheWayTo then return ordered end
+    local direct = ns.Util.Distance(origin, to)
+    local picks = {}
+    for _, step in ipairs(pool) do
+        local at = step.target and step.target.world
+        -- Steps the guide marks down (Story's side quests) aren't worth a stop.
+        if step ~= dest and QUICK_KINDS[step.kind] and at and at.continent == origin.continent
+            and step.key ~= dest.key and (step.bonus or 0) >= 0 then
+            local first = ns.Util.Distance(origin, at)
+            local detour = first + ns.Util.Distance(at, to) - direct
+            if first < direct and detour <= maxDetour then
+                picks[#picks + 1] = { step = step, d = first }
+            end
+        end
+    end
+    if #picks == 0 then return ordered end
+    table.sort(picks, function(a, b)
+        if a.d ~= b.d then return a.d < b.d end
+        return a.step.key < b.step.key
+    end)
+    local out, used = {}, {}
+    for i = 1, math.min(#picks, Planner.ON_THE_WAY_MAX) do
+        local step = picks[i].step
+        step.onTheWayTo = dest.key
+        step.onTheWayTitle = dest.title
+        out[#out + 1] = step
+        used[step] = true
+    end
+    for _, step in ipairs(ordered) do
+        if not used[step] and #out < (limit or math.huge) then out[#out + 1] = step end
+    end
+    return out
 end
 
 --- Choose the point closest to `origin` from a list of map points that

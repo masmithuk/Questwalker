@@ -66,6 +66,14 @@ function fixtures.durotar(mock, opts)
 end
 
 --- Put a quest in the fake log.
+--- The step you're heading for (quick stops on the way may come first).
+function fixtures.heading(state)
+    for _, s in ipairs(state.steps) do
+        if not s.onTheWayTo then return s end
+    end
+    return nil
+end
+
 function fixtures.addToLog(mock, id, title, complete, objectives)
     table.insert(mock.questLog, { id = id, title = title, complete = complete or false, objectives = objectives })
 end

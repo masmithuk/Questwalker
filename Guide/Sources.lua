@@ -532,6 +532,8 @@ function Sources.ClassQuests(ctx)
     return list
 end
 
+local PASS_BY_RANGE = 2000 -- yards: later quests whose giver is this close may be passed on the way
+
 local function availableSteps(ctx, out)
     local data = ns.QuestieData
     local rules = rulesOf(ctx)
@@ -587,20 +589,32 @@ local function availableSteps(ctx, out)
             end
         end
     end
-    for i = 1, count do
+    -- The rest (later in the guide's list, or past the pick-up limit) only
+    -- if you walk past their quest giver: picked up on the way, never a
+    -- trip of their own (see Planner.AddOnTheWay).
+    local last = count
+    for i = count + 1, #found do
+        if found[i].dist and found[i].dist <= PASS_BY_RANGE then last = i end
+    end
+    for i = 1, last do
         local f = found[i]
-        local name = data.GetQuestName(f.questID) or ("quest " .. f.questID)
-        local line = "Accept: " .. name
-        out[#out + 1] = {
-            key = "accept:" .. f.questID,
-            kind = "ACCEPT",
-            title = "Talk to " .. f.actor.name,
-            lines = { line },
-            questIDs = { f.questID },
-            actor = f.actor.kind .. ":" .. f.actor.id,
-            target = target(f.point, f.actor.name),
-            bonus = acceptBonus(ctx, f.questID, fromList and listRank(ctx, f.questID) and i or nil),
-        }
+        local passBy = i > count
+        if passBy and not (f.dist and f.dist <= PASS_BY_RANGE) then f = nil end
+        if f then
+            local name = data.GetQuestName(f.questID) or ("quest " .. f.questID)
+            local line = "Accept: " .. name
+            out[#out + 1] = {
+                key = "accept:" .. f.questID,
+                kind = "ACCEPT",
+                title = "Talk to " .. f.actor.name,
+                lines = { line },
+                questIDs = { f.questID },
+                actor = f.actor.kind .. ":" .. f.actor.id,
+                target = target(f.point, f.actor.name),
+                bonus = acceptBonus(ctx, f.questID, fromList and listRank(ctx, f.questID) and i or nil),
+                passBy = passBy or nil,
+            }
+        end
     end
 end
 

@@ -19,6 +19,7 @@ ns.Engine = Engine
 local REPLAN_DELAY = 0.3          -- seconds; coalesces bursts of quest events
 local TICK_INTERVAL = 3           -- seconds between position checks
 local REPLAN_DISTANCE = 150       -- yards walked before re-ordering steps
+local ON_THE_WAY_DEFAULT = 80     -- yards out of your way for a pick-up or hand-in
 
 Engine.state = {
     steps = {},
@@ -161,7 +162,19 @@ function Engine.Replan()
             end
         end
     end
-    state.steps = ns.Planner.Order(origin, merged, pinned, guideSettings().maxSteps)
+    -- "Pass by" pick-ups are only for doing on the way, not trips of their own.
+    local route = {}
+    for _, step in ipairs(merged) do
+        if not step.passBy or step.key == pinned then route[#route + 1] = step end
+    end
+    state.steps = ns.Planner.Order(origin, route, pinned, guideSettings().maxSteps)
+    -- Quest givers and hand-ins you pass on the way are done as you go
+    -- (not when you've picked the step yourself).
+    local chosen = (char.focusStep and pinned == char.focusStep) or ctx.focusQuest
+    if not chosen then
+        state.steps = ns.Planner.AddOnTheWay(origin, state.steps, merged,
+            ctx.rules and ctx.rules.onTheWay or ON_THE_WAY_DEFAULT, guideSettings().maxSteps)
+    end
     state.origin = origin
     state.log = ctx.log
     state.onHold = ctx.onHold or {}
@@ -174,7 +187,8 @@ function Engine.Replan()
     -- Already standing on a "go to" spot: tick it off (which plans again).
     if Engine.Arrived(first, origin) and Engine.MarkDone(first.key) then return end
     Engine.AnnotateZoneChange(ctx, first)
-    state.currentKey = first and first.key or nil
+    -- A stop on the way keeps the step you're heading for as the current one.
+    state.currentKey = first and (first.onTheWayTo or first.key) or nil
     ns.Waypoints.Set(state.steps, guideSettings().waypoints)
 
     if ns.GuideFrame then ns.GuideFrame.Update(state) end
