@@ -21,6 +21,7 @@ ns.MapPins = MapPins
 
 MapPins.MAX_STEPS = 10
 local SAME_SPOT = 0.012   -- markers closer than this (map fraction) merge
+local MAX_BLOBS = 400     -- circles drawn for hunting areas
 local PIN_SIZE = 22
 local PIN_LEVEL = 2200    -- above Blizzard's and Questie's map pins
 local CIRCLE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
@@ -99,32 +100,91 @@ function MapPins.SetRoute(player, point)
     drawn.dirty = true
 end
 
---- The markers to draw on `mapID` for the planned steps.
--- @return list of { x, y, numbers = {1, 3}, steps = {step, ...}, current = bool }
+MapPins.AREA_YARDS = 45        -- radius of the shading around each spawn
+MapPins.AREA_CLUSTER = 0.06    -- spawns closer than this (map fraction) are one area
+
+--- Yards across a map (left edge to right edge), or nil.
+local function mapWidthYards(mapID)
+    local GA = ns.GameApi
+    local a, b = GA.GetWorldPosition(mapID, 0, 0.5), GA.GetWorldPosition(mapID, 1, 0.5)
+    if not (a and b) or a.continent ~= b.continent then return nil end
+    return ns.Util.Distance(a, b)
+end
+
+--- Split points into areas: each point joins any area it's near.
+local function clusters(points, gap)
+    local groups = {}
+    for _, p in ipairs(points) do
+        local home
+        for _, g in ipairs(groups) do
+            for _, q in ipairs(g) do
+                if math.abs(p.x - q.x) < gap and math.abs(p.y - q.y) < gap then home = g; break end
+            end
+            if home then break end
+        end
+        if home then home[#home + 1] = p else groups[#groups + 1] = { p } end
+    end
+    return groups
+end
+
+local function addMarker(markers, x, y, i, step, extra)
+    for _, m in ipairs(markers) do
+        if not m.area and not (extra and extra.area)
+            and math.abs(m.x - x) < SAME_SPOT and math.abs(m.y - y) < SAME_SPOT then
+            if m.numbers[#m.numbers] ~= i then
+                m.numbers[#m.numbers + 1] = i
+                m.steps[#m.steps + 1] = step
+            end
+            return
+        end
+    end
+    local m = { x = x, y = y, numbers = { i }, steps = { step }, current = i == 1 }
+    for k, v in pairs(extra or {}) do m[k] = v end
+    markers[#markers + 1] = m
+end
+
+--- What to draw on `mapID` for the planned steps: numbered markers for
+--- places to go (quest givers, hand-ins, things to loot once), and shaded
+--- areas where creatures are to be killed, each with its number in the
+--- middle.
+-- @return markers { x, y, numbers, steps, current, area? }, and
+--         areas { x, y, number, current, radius (map fraction of width) }
 function MapPins.Layout(steps, mapID)
-    local markers = {}
-    if not mapID then return markers end
+    local markers, areas = {}, {}
+    if not mapID then return markers, areas end
+    local width = mapWidthYards(mapID)
+    local radius = width and width > 0 and MapPins.AREA_YARDS / width or 0.02
     for i, step in ipairs(steps or {}) do
         if i > MapPins.MAX_STEPS then break end
-        for _, t in ipairs(step.targets or { step.target }) do
-            local x, y = MapPins.Project(t, mapID)
-            if x then
-                local into
-                for _, m in ipairs(markers) do
-                    if math.abs(m.x - x) < SAME_SPOT and math.abs(m.y - y) < SAME_SPOT then into = m; break end
+        if step.areas then
+            local points = {}
+            for _, p in ipairs(step.areas) do
+                local x, y = MapPins.Project(p, mapID)
+                if x then points[#points + 1] = { x = x, y = y } end
+            end
+            for _, p in ipairs(points) do
+                areas[#areas + 1] = { x = p.x, y = p.y, number = i, current = i == 1, radius = radius }
+            end
+            for _, g in ipairs(clusters(points, MapPins.AREA_CLUSTER)) do
+                local sx, sy = 0, 0
+                for _, p in ipairs(g) do sx, sy = sx + p.x, sy + p.y end
+                addMarker(markers, sx / #g, sy / #g, i, step, { area = true })
+            end
+            -- Things to loot once still get their own markers.
+            for _, t in ipairs(step.targets or {}) do
+                if t.once then
+                    local x, y = MapPins.Project(t, mapID)
+                    if x then addMarker(markers, x, y, i, step) end
                 end
-                if into then
-                    if into.numbers[#into.numbers] ~= i then
-                        into.numbers[#into.numbers + 1] = i
-                        into.steps[#into.steps + 1] = step
-                    end
-                else
-                    markers[#markers + 1] = { x = x, y = y, numbers = { i }, steps = { step }, current = i == 1 }
-                end
+            end
+        else
+            for _, t in ipairs(step.targets or { step.target }) do
+                local x, y = MapPins.Project(t, mapID)
+                if x then addMarker(markers, x, y, i, step) end
             end
         end
     end
-    return markers
+    return markers, areas
 end
 
 --- "1", "2, 3" or "4-7" for a marker.
@@ -178,11 +238,49 @@ local function newPin(parent)
     return pin
 end
 
+local blobs = {}
+local areaLayer
+
 local function hideAll(from)
     for i = from or 1, #pins do pins[i]:Hide() end
     if not from then
         for _, dot in ipairs(dots) do dot:Hide() end
+        for _, blob in ipairs(blobs) do blob:Hide() end
     end
+end
+
+--- Shade the hunting areas: a soft circle round each spawn, so spawns
+--- close together read as one area. The current step's area is red,
+--- later ones blue.
+function MapPins.DrawAreas(child, areas, width)
+    if not areaLayer then
+        areaLayer = CreateFrame("Frame", nil, child)
+        areaLayer:SetAllPoints(child)
+        areaLayer:SetFrameLevel(PIN_LEVEL - 20)
+    end
+    local count = 0
+    for i, a in ipairs(areas or {}) do
+        if i > MAX_BLOBS then break end
+        count = i
+        local blob = blobs[i]
+        if not blob then
+            blob = areaLayer:CreateTexture(nil, "ARTWORK")
+            blob:SetTexture(CIRCLE)
+            blobs[i] = blob
+        end
+        if a.current then
+            blob:SetVertexColor(0.9, 0.2, 0.1, 0.22)
+        else
+            blob:SetVertexColor(0.2, 0.45, 0.9, 0.16)
+        end
+        local size = 2 * a.radius * width
+        blob:SetSize(size, size)
+        blob:ClearAllPoints()
+        blob:SetPoint("CENTER", child, "TOPLEFT", a.x * width, -a.y * child:GetHeight())
+        blob:Show()
+    end
+    for i = count + 1, #blobs do blobs[i]:Hide() end
+    MapPins.areaCount = count
 end
 
 --- Redraw the markers for the map being shown.
@@ -198,7 +296,8 @@ function MapPins.Draw()
     drawn.mapID, drawn.scale, drawn.width, drawn.dirty = mapID, scale, width, false
     if not width or width <= 0 then return end
 
-    local markers = MapPins.Layout(lastSteps, mapID)
+    local markers, areas = MapPins.Layout(lastSteps, mapID)
+    MapPins.DrawAreas(child, areas, width)
     for i, m in ipairs(markers) do
         local pin = pins[i] or newPin(child)
         pins[i] = pin
@@ -212,6 +311,7 @@ function MapPins.Draw()
         pin.text:SetText(MapPins.Label(m.numbers))
         local label = pin.text:GetText() or ""
         pin:SetWidth(PIN_SIZE + math.max(0, #label - 2) * 5)
+        pin.ring:SetVertexColor(m.area and 0.85 or 0, m.area and 0.2 or 0, m.area and 0.1 or 0, 0.95)
         if m.current then
             pin.bg:SetVertexColor(1, 0.75, 0.1, 1)
             pin.text:SetTextColor(0, 0, 0)

@@ -116,9 +116,12 @@ function Planner.GroupObjectives(steps, radius, origin)
             out[#out + 1] = g[1]
         else
             local ids, names, lines, keys = {}, {}, {}, {}
+            local areas, targets = {}, {}
             local best, bestDist, bonus = g[1], math.huge, 0
             for _, m in ipairs(g) do
                 for _, id in ipairs(m.questIDs) do ids[#ids + 1] = id end
+                for _, a in ipairs(m.areas or {}) do areas[#areas + 1] = a end
+                for _, t in ipairs(m.targets or { m.target }) do targets[#targets + 1] = t end
                 names[#names + 1] = m.questTitle or m.title
                 for _, l in ipairs(m.lines or {}) do lines[#lines + 1] = l end
                 keys[#keys + 1] = m.key
@@ -134,6 +137,8 @@ function Planner.GroupObjectives(steps, radius, origin)
                 lines = lines,
                 questIDs = ids,
                 target = best.target,
+                targets = targets,
+                areas = #areas > 0 and areas or nil,
                 bonus = bonus > 0 and bonus or nil,
                 grouped = #g,
             }

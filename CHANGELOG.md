@@ -2,6 +2,11 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.4] - 2026-11-25
+
+### Changed
+- **Hunting areas on the world map.** Where you need to kill creatures, the map now shades the area they spawn in (red for the step you're on, blue for later ones) with the step's number in the middle of each patch, instead of a pin at a single spawn. Quest givers, hand-ins and things you loot once (like the rifles in Treacherous Cold) keep their numbered pins.
+
 ## [0.9.3] - 2026-11-25
 
 ### Changed

@@ -205,6 +205,7 @@ end
 local SPOT_VISITED = 12      -- yards: you've been to a spot
 local SPOT_SAME = 25         -- yards: two spots this close are one
 local FEW_SPAWNS = 8         -- objects with this many spawns or fewer: show them all
+local MAX_AREA_POINTS = 300  -- spawn points kept for a hunting area
 
 local function visitedSpots(questID)
     local g = ns.Settings.char.guide
@@ -222,7 +223,8 @@ end
 --- so are spots you've been to while others remain. Creatures give their
 --- nearest spawn; objects and quest items with only a few spawns (bodies,
 --- crates, rifles) give each one.
--- @return list of { point, label, dist }
+-- @return list of { point, label, dist, once }, and the creatures' spawn
+--         points ({mapID, x, y}) as the area to hunt in
 function Sources.ObjectiveSpots(ctx, questID)
     local finished = {}
     for _, text in ipairs(ns.GameApi.GetFinishedObjectives(questID)) do finished[#finished + 1] = text:lower() end
@@ -234,7 +236,7 @@ function Sources.ObjectiveSpots(ctx, questID)
         end
         return false
     end
-    local spots = {}
+    local spots, area = {}, {}
     local function add(p, label, once)
         local point = withWorld(p)
         local _, dist = ns.Planner.Nearest(ctx.origin, { point })
@@ -250,6 +252,13 @@ function Sources.ObjectiveSpots(ctx, questID)
             else
                 local _, point = nearestActor(ctx.origin, { actor })
                 if point then add(point, actor.name) end
+                if actor.kind == "npc" then
+                    for _, p in ipairs(actor.points) do
+                        if #area < MAX_AREA_POINTS then
+                            area[#area + 1] = { mapID = p.mapID, x = p.x, y = p.y, label = actor.name }
+                        end
+                    end
+                end
             end
         end
     end
@@ -266,7 +275,7 @@ function Sources.ObjectiveSpots(ctx, questID)
     end
     if #fresh > 0 then spots = fresh end
     table.sort(spots, function(a, b) return a.dist < b.dist end)
-    return spots
+    return spots, area
 end
 
 --- Forget visited spots for quests that have left your log.
@@ -279,12 +288,17 @@ end
 
 local function objectiveStep(ctx, questID, quest)
     local point, label, targets
-    local spots = ns.QuestieData.IsReady() and Sources.ObjectiveSpots(ctx, questID) or {}
+    local spots, area = {}, {}
+    if ns.QuestieData.IsReady() then spots, area = Sources.ObjectiveSpots(ctx, questID) end
     if #spots >= 2 then
         -- Several places to go: head for the nearest, show them all.
         point, label = spots[1].point, spots[1].label
         targets = {}
-        for _, s in ipairs(spots) do targets[#targets + 1] = target(s.point, s.label) end
+        for _, s in ipairs(spots) do
+            local t = target(s.point, s.label)
+            t.once = s.once
+            targets[#targets + 1] = t
+        end
     else
         point = withWorld(ns.GameApi.GetQuestWaypoint(questID))
         if not point then
@@ -312,6 +326,7 @@ local function objectiveStep(ctx, questID, quest)
         questIDs = { questID },
         target = target(point, label or quest.title),
         targets = targets, -- every spot still to visit (when there's more than one)
+        areas = #area > 0 and area or nil, -- where the creatures are: drawn as an area on the map
     }
 end
 
