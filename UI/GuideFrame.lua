@@ -64,6 +64,9 @@ function GuideFrame.CurrentText(step)
     for _, line in ipairs(step.lines or {}) do
         lines[#lines + 1] = line
     end
+    if step.asYouGo then
+        lines[#lines + 1] = Util.Color("muted", L.GUIDE_AS_YOU_GO_FMT:format(step.asYouGo))
+    end
     if step.onTheWayTitle then
         lines[#lines + 1] = Util.Color("muted", L.GUIDE_ON_THE_WAY_FMT:format(step.onTheWayTitle))
     end

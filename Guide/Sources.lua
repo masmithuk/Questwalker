@@ -255,7 +255,8 @@ function Sources.ObjectiveSpots(ctx, questID)
                 if actor.kind == "npc" then
                     for _, p in ipairs(actor.points) do
                         if #area < MAX_AREA_POINTS then
-                            area[#area + 1] = { mapID = p.mapID, x = p.x, y = p.y, label = actor.name }
+                            area[#area + 1] = { mapID = p.mapID, x = p.x, y = p.y, label = actor.name,
+                                world = withWorld(p).world or nil }
                         end
                     end
                 end

@@ -70,6 +70,42 @@ end
 
 -- Objectives this close together (yards) are done as one step.
 Planner.GROUP_RADIUS = 150
+-- A quest whose creatures spread over more than this (yards, corner to
+-- corner) can be done anywhere along the way: it's folded into a nearby
+-- quest that's tied to one place.
+Planner.AMBIENT_SPREAD = 450
+local AREA_SAMPLE = 80 -- spawn points checked when comparing areas
+
+--- How far a step's hunting area spreads (yards, corner to corner of its
+--- spawns), or 0 when it has no area.
+function Planner.Spread(step)
+    if step.spread then return step.spread end
+    local minX, minY, maxX, maxY, continent
+    for _, p in ipairs(step.areas or {}) do
+        local w = p.world
+        if w and (not continent or w.continent == continent) then
+            continent = w.continent
+            minX, maxX = math.min(minX or w.x, w.x), math.max(maxX or w.x, w.x)
+            minY, maxY = math.min(minY or w.y, w.y), math.max(maxY or w.y, w.y)
+        end
+    end
+    local spread = 0
+    if minX then spread = math.sqrt((maxX - minX) ^ 2 + (maxY - minY) ^ 2) end
+    step.spread = spread
+    return spread
+end
+
+--- Are any of a step's spawns within `radius` of a world position?
+function Planner.AreaNear(step, world, radius)
+    if not world then return false end
+    local list = step.areas or {}
+    local every = math.max(1, math.floor(#list / AREA_SAMPLE))
+    for i = 1, #list, every do
+        local w = list[i].world
+        if w and w.continent == world.continent and ns.Util.Distance(w, world) <= radius then return true end
+    end
+    return false
+end
 
 local function near(a, b, radius)
     return a and b and a.continent == b.continent and ns.Util.Distance(a, b) <= radius
@@ -99,8 +135,20 @@ function Planner.GroupObjectives(steps, radius, origin)
     -- Deterministic order (the quest log arrives in no particular order).
     table.sort(solo, function(a, b) return (a.questIDs[1] or 0) < (b.questIDs[1] or 0) end)
 
-    local groups = {}
+    -- Quests whose creatures are everywhere (Protect the Frontier) are
+    -- done alongside a nearby quest that's tied to one place (A Bundle of
+    -- Trouble) rather than as a trip of their own.
+    local specific, ambient = {}, {}
     for _, step in ipairs(solo) do
+        if Planner.Spread(step) > Planner.AMBIENT_SPREAD then
+            ambient[#ambient + 1] = step
+        else
+            specific[#specific + 1] = step
+        end
+    end
+
+    local groups = {}
+    for _, step in ipairs(specific) do
         local home
         for _, g in ipairs(groups) do
             for _, member in ipairs(g) do
@@ -111,13 +159,34 @@ function Planner.GroupObjectives(steps, radius, origin)
         if home then home[#home + 1] = step else groups[#groups + 1] = { step } end
     end
 
+    for _, step in ipairs(ambient) do
+        -- Join the nearest place-tied group its creatures are found around.
+        local home, homeDist
+        for _, g in ipairs(groups) do
+            local anchor = g[1].target.world
+            if g.anchorOnly ~= false and Planner.AreaNear(step, anchor, radius) then
+                local d = origin and anchor.continent == origin.continent and ns.Util.Distance(origin, anchor) or 0
+                if not home or d < homeDist then home, homeDist = g, d end
+            end
+        end
+        if home then
+            home[#home + 1] = step
+            home.alongside = true
+        else
+            groups[#groups + 1] = { step, anchorOnly = false }
+        end
+    end
+
     for _, g in ipairs(groups) do
         if #g == 1 then
             out[#out + 1] = g[1]
         else
             local ids, names, lines, keys = {}, {}, {}, {}
-            local areas, targets = {}, {}
+            local areas, targets, asYouGo = {}, {}, {}
             local best, bestDist, bonus = g[1], math.huge, 0
+            local anchored = g.alongside -- head for the place-tied quests, not the widespread one
+            -- Names and lines in quest order, however the group was formed.
+            table.sort(g, function(x, y) return (x.questIDs[1] or 0) < (y.questIDs[1] or 0) end)
             for _, m in ipairs(g) do
                 for _, id in ipairs(m.questIDs) do ids[#ids + 1] = id end
                 for _, a in ipairs(m.areas or {}) do areas[#areas + 1] = a end
@@ -128,7 +197,9 @@ function Planner.GroupObjectives(steps, radius, origin)
                 bonus = math.max(bonus, m.bonus or 0)
                 local d = origin and m.target.world.continent == origin.continent
                     and ns.Util.Distance(origin, m.target.world) or math.huge
-                if d < bestDist then best, bestDist = m, d end
+                local eligible = not anchored or Planner.Spread(m) <= Planner.AMBIENT_SPREAD
+                if not eligible then asYouGo[#asYouGo + 1] = m.questTitle or m.title end
+                if eligible and d < bestDist then best, bestDist = m, d end
             end
             out[#out + 1] = {
                 key = table.concat(keys, "+"),
@@ -139,6 +210,7 @@ function Planner.GroupObjectives(steps, radius, origin)
                 target = best.target,
                 targets = targets,
                 areas = #areas > 0 and areas or nil,
+                asYouGo = #asYouGo > 0 and Planner.JoinNames(asYouGo) or nil,
                 bonus = bonus > 0 and bonus or nil,
                 grouped = #g,
             }

@@ -2,6 +2,11 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.5] - 2026-11-25
+
+### Changed
+- **Widespread kill quests are done alongside others.** Quests whose creatures are found all over a zone (like Protect the Frontier) no longer get a trip of their own. When their creatures are found around a quest tied to one place (like A Bundle of Trouble), the two become one step that takes you to the place-tied quest, and the guide window says to kill the others as you go. Once the place-tied quest is done, the widespread one carries on by itself if it's still unfinished.
+
 ## [0.9.4] - 2026-11-25
 
 ### Changed
