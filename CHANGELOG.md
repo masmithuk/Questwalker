@@ -2,6 +2,12 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.6] - 2026-11-25
+
+### Fixed
+- **Every quest says what to do.** A quest with no counters to show (go somewhere, find someone, use an item) used to appear as just its name in a step. It now shows what the quest asks, or says to check the quest log if that isn't known.
+- **"On your way to" shows what's there.** When a pick-up or hand-in comes first, the guide window now lists what you'll be doing at the step you're heading for, not just its name.
+
 ## [0.9.5] - 2026-11-25
 
 ### Changed

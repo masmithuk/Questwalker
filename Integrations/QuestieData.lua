@@ -766,6 +766,21 @@ end
 
 --- What QuestieDB knows about a quest: { id, name, level, requiredLevel,
 --- zone }. Works for unknown quests too (name "Quest <id>", level 0).
+--- The quest's own "what to do" text (its objectives summary), or nil.
+function QuestieData.ObjectiveText(questID)
+    if not QuestieData.IsReady() then return nil end
+    local text = get("Quest", questID, "objectivesText")
+    if type(text) == "table" then
+        local parts = {}
+        for _, t in ipairs(text) do
+            if type(t) == "string" and t ~= "" then parts[#parts + 1] = t end
+        end
+        text = table.concat(parts, " ")
+    end
+    if type(text) ~= "string" or text == "" then return nil end
+    return text
+end
+
 function QuestieData.Describe(id, name)
     local zoneOrSort = get("Quest", id, "zoneOrSort")
     local zone = type(zoneOrSort) == "number" and zoneOrSort > 0

@@ -22,6 +22,7 @@ local Util = ns.Util
 
 local WIDTH = 320 -- default width; the window can be resized from 260 to 640
 local MIN_WIDTH, MAX_WIDTH = 260, 640
+local ON_THE_WAY_LINES = 6 -- lines of the step you are heading for, shown under "On your way to"
 
 local function savedWidth()
     local w = ns.Settings.account.guide.width or WIDTH
@@ -69,6 +70,14 @@ function GuideFrame.CurrentText(step)
     end
     if step.onTheWayTitle then
         lines[#lines + 1] = Util.Color("muted", L.GUIDE_ON_THE_WAY_FMT:format(step.onTheWayTitle))
+        -- ...and what you'll do there.
+        for k, line in ipairs(step.onTheWayLines or {}) do
+            if k > ON_THE_WAY_LINES then
+                lines[#lines + 1] = Util.Color("muted", "  ...")
+                break
+            end
+            lines[#lines + 1] = Util.Color("muted", "  " .. line)
+        end
     end
     if not step.target and not step.noArrow then
         lines[#lines + 1] = Util.Color("muted", L.GUIDE_NO_LOCATION)

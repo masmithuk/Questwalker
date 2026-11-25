@@ -309,8 +309,15 @@ local function objectiveStep(ctx, questID, quest)
         end
     end
     local lines = { quest.title }
-    for _, objective in ipairs(ns.GameApi.GetOpenObjectives(questID)) do
+    local open = ns.GameApi.GetOpenObjectives(questID)
+    for _, objective in ipairs(open) do
         lines[#lines + 1] = "  " .. objective
+    end
+    if #open == 0 then
+        -- No counters to show (go somewhere, find someone, use an item):
+        -- say what the quest asks instead.
+        local text = ns.QuestieData.ObjectiveText(questID)
+        lines[#lines + 1] = "  " .. (text or ns.L.STEP_SEE_QUEST_LOG)
     end
     -- Elites: how to solo them (pull to nearby guards) or to group up.
     if ns.QuestieData.IsReady() then

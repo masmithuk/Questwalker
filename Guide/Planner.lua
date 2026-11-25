@@ -322,6 +322,7 @@ function Planner.AddOnTheWay(origin, ordered, pool, maxDetour, limit)
         local step = picks[i].step
         step.onTheWayTo = dest.key
         step.onTheWayTitle = dest.title
+        step.onTheWayLines = dest.lines
         out[#out + 1] = step
         used[step] = true
     end
