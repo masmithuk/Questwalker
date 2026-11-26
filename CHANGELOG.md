@@ -2,6 +2,14 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.9] - 2026-11-26
+
+### Changed
+- **Quests with the same enemies are taken together.** A quest whose enemies overlap with an unfinished one in your log, or with one you're about to pick up, is now picked up first so you do them in one go. For example, Red Leather Bandanas drop from the Defias that The People's Militia has you kill. These quests:
+  - get a strong preference, and are taken even when they're far down your guide's list or not on it
+  - jump ahead of the killing when their quest giver is within about 600 yards of you
+  - say so on the step: "Same enemies as The People's Militia: take it first and do them together."
+
 ## [0.9.8] - 2026-11-26
 
 ### Added

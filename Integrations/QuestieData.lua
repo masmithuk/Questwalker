@@ -262,6 +262,19 @@ local function actors(questID, field, faction)
     return result
 end
 
+--- The creatures a quest has you deal with: those to kill and those that
+--- drop the items it needs, as a set { [npcID] = true }.
+function QuestieData.ObjectiveCreatures(questID)
+    local set = {}
+    local objectives = get("Quest", questID, "objectives")
+    if type(objectives) ~= "table" then return set end
+    for _, creature in ipairs(objectives[1] or {}) do set[creature[1]] = true end
+    for _, item in ipairs(objectives[3] or {}) do
+        for _, npcID in ipairs(get("Item", item[1], "npcDrops") or {}) do set[npcID] = true end
+    end
+    return set
+end
+
 --- The items a quest asks you to collect: { {id, name, count} }.
 function QuestieData.ObjectiveItems(questID)
     local out = {}

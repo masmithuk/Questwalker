@@ -88,6 +88,7 @@ local LIST_BONUSES = { 1500, 1200, 900 }
 -- Class quests (spells, totems, forms, pets) come first: their pick-up,
 -- objectives and hand-in are treated as this many yards closer.
 local CLASS_BONUS = 5000
+local SHARED_BONUS = 900   -- yards: how much a quest sharing enemies with one you're doing is preferred
 
 --- Quests the chosen guide never picks up (its "skip quests" list), or
 --- that you skipped in the step guide.
@@ -507,7 +508,28 @@ function Sources.DoableQuests(ctx)
     if not data.IsReady() then return {}, false end
 
     local listed = doableListed(ctx)
-    if #listed > 0 then return Sources.ResolveNeeds(ctx, listed), true end
+    if #listed > 0 then
+        -- Quests off the list that share enemies with one you're on are
+        -- worth taking too: the killing is happening anyway.
+        local working = {}
+        for id, q in pairs(ctx.log) do
+            if not q.complete then working[#working + 1] = id end
+        end
+        if #working > 0 then
+            local have = {}
+            for _, id in ipairs(listed) do have[id] = true end
+            local level, rules = ctx.profile.level, rulesOf(ctx)
+            for _, id in ipairs(data.GetCandidates(level, rules)) do
+                if not have[id] and not ctx.log[id] and not isSkipped(ctx, id)
+                    and #Sources.SharedEnemies(ctx, id, working) > 0
+                    and not data.TooHard(id, level, rules) and data.IsDoable(id, ctx) then
+                    listed[#listed + 1] = id
+                    have[id] = true
+                end
+            end
+        end
+        return Sources.ResolveNeeds(ctx, listed), true
+    end
 
     local doable = {}
     local level, rules = ctx.profile.level, rulesOf(ctx)
@@ -581,9 +603,40 @@ function Sources.WantsQuest(ctx, questID)
     return true
 end
 
+--- Quests that share enemies: for a quest you could pick up, the quests
+--- (in your log and unfinished, or about to be picked up) whose creatures
+--- overlap with its own. Doing them together means one lot of killing.
+-- @param others list of quest IDs to compare with
+-- @return list of quest IDs it overlaps with
+function Sources.SharedEnemies(ctx, questID, others)
+    local data = ns.QuestieData
+    ctx.creatureCache = ctx.creatureCache or {}
+    local function creatures(id)
+        local set = ctx.creatureCache[id]
+        if not set then
+            set = data.ObjectiveCreatures(id)
+            ctx.creatureCache[id] = set
+        end
+        return set
+    end
+    local mine = creatures(questID)
+    if next(mine) == nil then return {} end
+    local out = {}
+    for _, other in ipairs(others) do
+        if other ~= questID then
+            for npcID in pairs(creatures(other)) do
+                if mine[npcID] then out[#out + 1] = other; break end
+            end
+        end
+    end
+    return out
+end
+
 local function acceptBonus(ctx, questID, listPosition)
     local rules = rulesOf(ctx)
     local bonus = listPosition and LIST_BONUSES[listPosition] or 0
+    -- Same enemies as a quest you're on or about to take: get it first.
+    if ctx.sharedWith and ctx.sharedWith[questID] then bonus = bonus + SHARED_BONUS end
     if (rules.chainBonus or 0) > 0 and ns.QuestieData.IsFollowUp(questID) then
         bonus = bonus + rules.chainBonus
     end
@@ -677,6 +730,27 @@ local function availableSteps(ctx, out)
             end
         end
     end
+    -- Quests sharing enemies with one in your log (unfinished) or one being
+    -- picked up now are taken together, wherever they are in the list.
+    local working = {}
+    for id, q in pairs(ctx.log) do
+        if not q.complete then working[#working + 1] = id end
+    end
+    for i = 1, count do working[#working + 1] = found[i].questID end
+    ctx.sharedWith = {}
+    for i, f in ipairs(found) do
+        local shared = Sources.SharedEnemies(ctx, f.questID, working)
+        if #shared > 0 then
+            ctx.sharedWith[f.questID] = shared
+            if i > count then
+                -- Move it up into the quests being picked up.
+                table.remove(found, i)
+                count = count + 1
+                table.insert(found, count, f)
+            end
+        end
+    end
+
     -- The rest (later in the guide's list, or past the pick-up limit) only
     -- if you walk past their quest giver: picked up on the way, never a
     -- trip of their own (see Planner.AddOnTheWay).
@@ -691,6 +765,14 @@ local function availableSteps(ctx, out)
         if f then
             local name = data.GetQuestName(f.questID) or ("quest " .. f.questID)
             local lines = { "Accept: " .. name }
+            local shared = ctx.sharedWith and ctx.sharedWith[f.questID]
+            if shared then
+                local names = {}
+                for _, id in ipairs(shared) do
+                    names[#names + 1] = (ctx.log[id] and ctx.log[id].title) or data.GetQuestName(id) or ("quest " .. id)
+                end
+                lines[#lines + 1] = "  " .. ns.L.STEP_SHARED_FMT:format(table.concat(names, ", "))
+            end
             -- Picked up to unlock a quest further on.
             for unlocked, entry in pairs(ctx.needsFirst or {}) do
                 for _, via in ipairs(entry.via) do
@@ -710,6 +792,7 @@ local function availableSteps(ctx, out)
                 target = target(f.point, f.actor.name),
                 bonus = acceptBonus(ctx, f.questID, fromList and listRank(ctx, f.questID) and i or nil),
                 passBy = passBy or nil,
+            sharedWith = shared, -- quest IDs it shares enemies with
             }
         end
     end

@@ -283,6 +283,9 @@ end
 -- Quick stops worth making on the way: they take seconds once you're there.
 local QUICK_KINDS = { ACCEPT = true, TURNIN = true }
 Planner.ON_THE_WAY_MAX = 4
+-- A quest giver this close (yards) with a quest sharing enemies with the
+-- step you're heading for is visited first, detour or not.
+Planner.SHARED_RANGE = 600
 
 --- Pick up and hand in quests on the way to the current step. Any quick
 --- stop (an ACCEPT or TURNIN from the candidates) that adds at most
@@ -299,9 +302,21 @@ function Planner.AddOnTheWay(origin, ordered, pool, maxDetour, limit)
     end
     if QUICK_KINDS[dest.kind] and dest.onTheWayTo then return ordered end
     local direct = ns.Util.Distance(origin, to)
+    -- Quests sharing enemies with the one you're heading out to do.
+    local heading = {}
+    for _, id in ipairs(dest.questIDs or {}) do heading[id] = true end
     local picks = {}
     for _, step in ipairs(pool) do
         local at = step.target and step.target.world
+        local together = false
+        for _, id in ipairs(step.sharedWith or {}) do
+            if heading[id] then together = true; break end
+        end
+        if together and at and at.continent == origin.continent and step.key ~= dest.key
+            and ns.Util.Distance(origin, at) <= Planner.SHARED_RANGE then
+            picks[#picks + 1] = { step = step, d = ns.Util.Distance(origin, at) }
+            at = nil -- taken; skip the detour test below
+        end
         -- Steps the guide marks down (Story's side quests) aren't worth a stop.
         if step ~= dest and QUICK_KINDS[step.kind] and at and at.continent == origin.continent
             and step.key ~= dest.key and (step.bonus or 0) >= 0 then
