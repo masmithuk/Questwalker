@@ -45,6 +45,7 @@ local STATUS = {
     locked   = { "muted",  "QUEST_LOCKED" },
     later    = { "muted",  "STEPS_LATER" },
     notoffered = { "muted", "STEPS_NOT_OFFERED" },
+    needs = { "muted", "STEPS_NEEDS" },
     onhold   = { "warn",   "STEPS_ON_HOLD_FMT" },
     toolow   = { "muted",  "STEPS_TOO_LOW" },
     group    = { "muted",  "STEPS_GROUP" },
@@ -65,6 +66,8 @@ function StepsTab.StatusLabel(row)
     if row.isStep and row.status == "upcoming" then entry = STEP_UPCOMING end
     local label = L[entry[2]]
     if row.status == "level" or row.status == "onhold" then label = label:format(row.requiredLevel or 0) end
+    -- Say what's needed ("Needs: finish ... first") rather than just that something is.
+    if row.status == "needs" and row.needs and row.needs[1] then label = row.needs[1] end
     return C(entry[1], label)
 end
 

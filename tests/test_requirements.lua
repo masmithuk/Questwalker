@@ -71,4 +71,63 @@ return {
         for _ = 1, 6 do ns.Engine.CheckSilentGiver(1) end
         T.eq(next(QuestwalkerCharDB.guide.notOffered), nil)
     end },
+
+    { "planning: a quest needing an earlier one sends you to the earlier one", function(T)
+        local ns, mock = T.fresh()
+        local db = fixtures.durotar(mock)
+        db.Quest[106].preQuestSingle = { 101 }
+        fixtures.login(ns)
+        local ctx = ns.Engine.BuildContext()
+        local out = ns.Sources.ResolveNeeds(ctx, { 106 })
+        T.eq(table.concat(out, ","), "101")
+        T.eq(ctx.needsFirst[106].via[1], 101)
+        T.contains(ctx.needsFirst[106].lines, "Needs: finish Vile Familiars first")
+    end },
+
+    { "planning: follows a chain back to what you can take now", function(T)
+        local ns, mock = T.fresh()
+        local db = fixtures.durotar(mock)
+        db.Quest[102].preQuestSingle = { 101 }
+        db.Quest[106].preQuestSingle = { 102 }
+        fixtures.login(ns)
+        local ctx = ns.Engine.BuildContext()
+        T.eq(table.concat(ns.Sources.ResolveNeeds(ctx, { 106 }), ","), "101")
+    end },
+
+    { "planning: already on the earlier quest, nothing extra", function(T)
+        local ns, mock = T.fresh()
+        local db = fixtures.durotar(mock)
+        db.Quest[106].preQuestSingle = { 101 }
+        fixtures.addToLog(mock, 101, "Vile Familiars", false)
+        fixtures.login(ns)
+        local ctx = ns.Engine.BuildContext()
+        T.eq(#ns.Sources.ResolveNeeds(ctx, { 106 }), 0)
+    end },
+
+    { "planning: a profession or holiday quest waits", function(T)
+        local ns, mock = T.fresh()
+        local db = fixtures.durotar(mock)
+        db.Quest[106].requiredSkill = { 185, 50 }
+        db.Quest[102].zoneOrSort = -22
+        fixtures.login(ns)
+        local ctx = ns.Engine.BuildContext()
+        T.eq(table.concat(ns.Sources.ResolveNeeds(ctx, { 106, 102, 101 }), ","), "101")
+        T.eq(#ctx.needsFirst[106].via, 0)
+    end },
+
+    { "in game: no trip to a holiday quest's giver, and the Steps list says why", function(T)
+        local ns, mock = T.fresh()
+        local db = fixtures.durotar(mock)
+        db.Quest[102].zoneOrSort = -22 -- the Foreman's quest
+        QuestwalkerCharDB.guide.trainedLevel = 60
+        local state = fixtures.login(ns)
+        for _, s in ipairs(state.steps) do
+            for _, id in ipairs(s.questIDs or {}) do T.truthy(id ~= 102, "102 isn't a step") end
+        end
+        local ctx = ns.Engine.BuildContext()
+        T.truthy(ctx.needsFirst[102], "noted")
+        T.contains(ctx.needsFirst[102].lines, "Only during a holiday event")
+        T.contains(ns.StepsTab.StatusLabel({ status = "needs", needs = ctx.needsFirst[102].lines }),
+            "Only during a holiday event")
+    end },
 }

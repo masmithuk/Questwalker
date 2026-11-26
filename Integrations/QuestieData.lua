@@ -802,9 +802,13 @@ end
 --- 50"). Only requirements that aren't met, or can't be checked, are
 --- listed. Empty when there's nothing known.
 -- @param ctx { isCompleted(id), log } (as for IsDoable)
+-- @return lines, and { quests = {unfinished earlier quests}, oneOf = bool
+--         (any one of them will do), blocked = bool (something other than
+--         quests is missing) }
 function QuestieData.Requirements(questID, ctx)
     local out = {}
-    if not QuestieData.IsReady() then return out end
+    local info = { quests = {}, oneOf = false, blocked = false }
+    if not QuestieData.IsReady() then return out, info end
     local L = ns.L
     local done = ctx and ctx.isCompleted or ns.GameApi.IsQuestCompleted
     local log = ctx and ctx.log or {}
@@ -813,7 +817,10 @@ function QuestieData.Requirements(questID, ctx)
     if type(group) == "table" then
         local missing = {}
         for _, id in ipairs(group) do if not done(id) then missing[#missing + 1] = id end end
-        if #missing > 0 then out[#out + 1] = L.NEEDS_QUESTS_FMT:format(questNames(missing)) end
+        if #missing > 0 then
+            out[#out + 1] = L.NEEDS_QUESTS_FMT:format(questNames(missing))
+            for _, id in ipairs(missing) do info.quests[#info.quests + 1] = id end
+        end
     end
     local single = get("Quest", questID, "preQuestSingle")
     if type(single) == "table" and #single > 0 then
@@ -821,6 +828,8 @@ function QuestieData.Requirements(questID, ctx)
         for _, id in ipairs(single) do if done(id) then any = true; break end end
         if not any then
             out[#out + 1] = (#single == 1 and L.NEEDS_QUESTS_FMT or L.NEEDS_ONE_OF_FMT):format(questNames(single))
+            for _, id in ipairs(single) do info.quests[#info.quests + 1] = id end
+            info.oneOf = #single > 1 and #info.quests == #single
         end
     end
 
@@ -829,7 +838,10 @@ function QuestieData.Requirements(questID, ctx)
         local name = SKILL_NAMES[skill[1]] or ("skill " .. skill[1])
         local need = skill[2] or 1
         local have = skillRank(name)
-        if not have or have < need then out[#out + 1] = L.NEEDS_SKILL_FMT:format(name, need) end
+        if not have or have < need then
+            out[#out + 1] = L.NEEDS_SKILL_FMT:format(name, need)
+            info.blocked = true
+        end
     end
 
     local rep = get("Quest", questID, "requiredMinRep")
@@ -841,6 +853,7 @@ function QuestieData.Requirements(questID, ctx)
         end
         if not value or value < (rep[2] or 0) then
             out[#out + 1] = L.NEEDS_REP_FMT:format(standingName(rep[2] or 0), name or ("faction " .. rep[1]))
+            info.blocked = true
         end
     end
 
@@ -850,6 +863,7 @@ function QuestieData.Requirements(questID, ctx)
         if not known then
             local name = GetSpellInfo and GetSpellInfo(spell)
             out[#out + 1] = L.NEEDS_SPELL_FMT:format(name or ("spell " .. spell))
+            info.blocked = true
         end
     end
 
@@ -858,6 +872,7 @@ function QuestieData.Requirements(questID, ctx)
         for _, item in ipairs(items) do
             if not (GetItemCount and GetItemCount(item) > 0) then
                 out[#out + 1] = L.NEEDS_ITEM_FMT:format(get("Item", item, "name") or ("item " .. item))
+                info.blocked = true
             end
         end
     end
@@ -868,11 +883,17 @@ function QuestieData.Requirements(questID, ctx)
         for _, id in ipairs(exclusive) do
             if log[id] or done(id) then blocking[#blocking + 1] = id end
         end
-        if #blocking > 0 then out[#out + 1] = L.NEEDS_NOT_WITH_FMT:format(questNames(blocking)) end
+        if #blocking > 0 then
+            out[#out + 1] = L.NEEDS_NOT_WITH_FMT:format(questNames(blocking))
+            info.blocked = true
+        end
     end
 
-    if get("Quest", questID, "zoneOrSort") == SEASONAL_SORT then out[#out + 1] = L.NEEDS_HOLIDAY end
-    return out
+    if get("Quest", questID, "zoneOrSort") == SEASONAL_SORT then
+        out[#out + 1] = L.NEEDS_HOLIDAY
+        info.blocked = true
+    end
+    return out, info
 end
 
 --- The quest's own "what to do" text (its objectives summary), or nil.

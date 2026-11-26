@@ -15,6 +15,8 @@
       level     you're not high enough yet
       locked    needs an earlier quest (or other requirement) first
       later     a guide step (note, buy, train...) you haven't reached yet
+      needs       it needs something first (an earlier quest, a profession,
+                  reputation...); the reasons are in row.needs
       notoffered  its quest giver didn't offer it to you (needs an item,
                 reputation, ...); checked again when you level up
 
@@ -118,6 +120,9 @@ local function questRow(ctx, i, q, inCurrent)
         row.status = "skipped"
     elseif ctx.notOffered and ctx.notOffered[q.id] then
         row.status = "notoffered"
+    elseif ctx.needsFirst and ctx.needsFirst[q.id] then
+        row.status = "needs"
+        row.needs = ctx.needsFirst[q.id].lines
     elseif ns.Sources.HideGroupQuest(ctx, q.id) then
         row.status = "group"
     else

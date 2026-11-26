@@ -5,7 +5,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ## [0.9.7] - 2026-11-26
 
 ### Fixed
-- **Quests that need something first.** A pick-up step now lists anything the quest needs that you don't have yet: an earlier quest ("Needs: finish ... first"), a profession level, reputation, a spell, an item in your bags, a quest it can't be taken with, or a holiday event.
+- **Quests that need something first aren't a trip any more.** Before you're sent to a quest giver, the guide checks what the quest needs: an earlier quest, a profession level, reputation, a spell, an item in your bags, a quest it can't be taken with, or a holiday event.
+  - Missing an earlier quest: the first quest in that chain you can take now is planned instead, weighed like any other quest (so Speedrun drops it if it isn't worth it), with "Leads to: ..." on its step.
+  - Missing anything else: the quest waits.
+  - Either way, the Steps list shows it as needing something first and says what.
 - **Quest givers with nothing to say.** Talking to an NPC who has nothing for you opens no window, so the guide kept sending you back. If you stand next to the step's quest giver with them targeted and nothing opens for 8 seconds, the guide treats the quest as not offered yet and moves on. It checks again when you level up.
 - **The "not offered" message says why** when the reason is known, instead of guessing.
 

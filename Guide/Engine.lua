@@ -99,6 +99,7 @@ function Engine.BuildContext()
         -- to tell where guide steps come up). Replan refreshes them.
         doable = doableCache and doableCache.list,
         doableFromList = doableCache and doableCache.fromList,
+        needsFirst = doableCache and doableCache.needsFirst or {},
     }
 end
 
@@ -121,13 +122,15 @@ function Engine.Replan()
     local questsChanged = false
     if not doableCache and ns.QuestieData.IsReady() then
         local list, fromList = ns.Sources.DoableQuests(ctx)
-        doableCache = { list = list, fromList = fromList, rates = ctx.rates, rateMedian = ctx.rateMedian }
+        doableCache = { list = list, fromList = fromList, rates = ctx.rates, rateMedian = ctx.rateMedian,
+            needsFirst = ctx.needsFirst }
         questsChanged = true
     end
     ctx.doable = doableCache and doableCache.list
     ctx.rates = doableCache and doableCache.rates
     ctx.rateMedian = doableCache and doableCache.rateMedian
     ctx.doableFromList = doableCache and doableCache.fromList
+    ctx.needsFirst = doableCache and doableCache.needsFirst or {}
 
     -- So is a step chosen there, until it's ticked off.
     if char.focusStep and char.done[char.focusStep] then char.focusStep = nil end

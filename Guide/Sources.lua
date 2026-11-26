@@ -439,12 +439,73 @@ end
 --- expensive part of planning, so the Engine caches it between
 --- quest-state changes.
 -- @return list of quest IDs, and whether they came from the quest list
+local PREREQ_DEPTH = 4 -- how far back a chain of earlier quests is followed
+
+--- The first quests you can pick up now that lead to `questID` (its
+--- unfinished earlier quests, followed back up to PREREQ_DEPTH steps).
+-- @return list of quest IDs ({} when none can be taken now)
+function Sources.PrereqsToDo(ctx, questID, depth, seen)
+    depth, seen = depth or 0, seen or {}
+    local data = ns.QuestieData
+    local _, info = data.Requirements(questID, ctx)
+    local level, rules = ctx.profile.level, rulesOf(ctx)
+    local out = {}
+    for _, id in ipairs(info.quests) do
+        if not seen[id] then
+            seen[id] = true
+            if ctx.log[id] then
+                -- Already on it: finishing it is enough.
+                if info.oneOf then return {} end
+            elseif data.IsDoable(id, ctx) and not data.TooHard(id, level, rules) then
+                out[#out + 1] = id
+                if info.oneOf then return out end -- any one of them will do
+            elseif depth < PREREQ_DEPTH then
+                for _, earlier in ipairs(Sources.PrereqsToDo(ctx, id, depth + 1, seen)) do
+                    out[#out + 1] = earlier
+                end
+            end
+        end
+    end
+    return out
+end
+
+--- Hold back quests that need something first, so you aren't sent to a
+--- quest giver with nothing to give. When it's earlier quests that are
+--- missing, the first of them you can take now go in its place (and are
+--- weighed like any other quest); anything else missing (a profession,
+--- reputation, an item, a holiday) waits. Fills ctx.needsFirst[id] =
+--- { lines, via = {quest IDs put in its place} }.
+function Sources.ResolveNeeds(ctx, list)
+    ctx.needsFirst = {}
+    local out, seen = {}, {}
+    local function add(id)
+        if not seen[id] then
+            seen[id] = true
+            out[#out + 1] = id
+        end
+    end
+    for _, id in ipairs(list) do
+        local lines, info = ns.QuestieData.Requirements(id, ctx)
+        if #lines == 0 then
+            add(id)
+        else
+            local via = {}
+            if not info.blocked then
+                via = Sources.PrereqsToDo(ctx, id)
+                for _, earlier in ipairs(via) do add(earlier) end
+            end
+            ctx.needsFirst[id] = { lines = lines, via = via }
+        end
+    end
+    return out
+end
+
 function Sources.DoableQuests(ctx)
     local data = ns.QuestieData
     if not data.IsReady() then return {}, false end
 
     local listed = doableListed(ctx)
-    if #listed > 0 then return listed, true end
+    if #listed > 0 then return Sources.ResolveNeeds(ctx, listed), true end
 
     local doable = {}
     local level, rules = ctx.profile.level, rulesOf(ctx)
@@ -455,7 +516,7 @@ function Sources.DoableQuests(ctx)
             doable[#doable + 1] = questID
         end
     end
-    return Sources.FilterByRate(doable, ctx), false
+    return Sources.ResolveNeeds(ctx, Sources.FilterByRate(doable, ctx)), false
 end
 
 --- Speedrun: XP per minute for each quest (QuestValue), and drop quests
@@ -626,8 +687,15 @@ local function availableSteps(ctx, out)
         if f then
             local name = data.GetQuestName(f.questID) or ("quest " .. f.questID)
             local lines = { "Accept: " .. name }
-            -- Anything it needs first, so "nothing to pick up" makes sense.
-            for _, need in ipairs(data.Requirements(f.questID, ctx)) do lines[#lines + 1] = "  " .. need end
+            -- Picked up to unlock a quest further on.
+            for unlocked, entry in pairs(ctx.needsFirst or {}) do
+                for _, via in ipairs(entry.via) do
+                    if via == f.questID then
+                        lines[#lines + 1] = "  " .. ns.L.STEP_UNLOCKS_FMT:format(
+                            data.GetQuestName(unlocked) or ("quest " .. unlocked))
+                    end
+                end
+            end
             out[#out + 1] = {
                 key = "accept:" .. f.questID,
                 kind = "ACCEPT",
