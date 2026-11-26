@@ -57,6 +57,7 @@ local ACCOUNT_DEFAULTS = {
         mapNumbers = true,    -- numbered markers on the world map for the next steps
         compass = true,       -- compass bar at the top of the screen
         minimapRoute = true,  -- the Questwalker arrow's route as dots on the minimap
+        buyTips = true,       -- "Or buy ... on the Auction House / from a vendor" on collect steps
     },
 }
 

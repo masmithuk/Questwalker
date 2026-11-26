@@ -26,6 +26,8 @@ you're in. Pick up, do, hand in, repeat, all the way to 60.
   roughly how long it'll take. For long trips it plans the quickest way using flight paths you've found, your
   Hearthstone, and boats and zeppelins, then talks you through each part ("Fly to Camp Taurajo"). The route is
   drawn on the world map and the minimap.
+- **Buy instead of farm:** when a quest item can be bought from a vendor or on the Auction House, the step says
+  so, with the price if you use Auctionator or TradeSkillMaster.
 - **Compass at the top of the screen:** as you turn, it shows which way each of your next steps is, numbered in
   order. Hover a number to see what to do and how far away it is. Your party members show up on it too.
 - **Numbered steps on the world map:** see where each of your next steps is, in order. Where you need to kill

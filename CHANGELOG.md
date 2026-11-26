@@ -2,6 +2,14 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.8] - 2026-11-26
+
+### Added
+- **Buy instead of farm.** Steps where you collect items now suggest buying what you still need when it can be bought:
+  - **from a vendor**, when an NPC sells it: "Or buy 6 Linen Cloth from <vendor>, <zone>."
+  - **on the Auction House**, when the item can be traded, with the going rate when an auction addon knows it (Auctionator or TradeSkillMaster, and Coin Forge once it shares its prices): "Or buy 6 Chunk of Boar Meat on the Auction House: about 9s (1s 50c each, Auctionator)."
+  - Quest-only items can't be bought, so they get no tip. Turn the tips off with Settings > "Suggest buying quest items".
+
 ## [0.9.7] - 2026-11-26
 
 ### Fixed

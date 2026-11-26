@@ -262,6 +262,32 @@ local function actors(questID, field, faction)
     return result
 end
 
+--- The items a quest asks you to collect: { {id, name, count} }.
+function QuestieData.ObjectiveItems(questID)
+    local out = {}
+    local objectives = get("Quest", questID, "objectives")
+    if type(objectives) ~= "table" then return out end
+    for _, item in ipairs(objectives[3] or {}) do
+        out[#out + 1] = { id = item[1], name = get("Item", item[1], "name") or ("item " .. item[1]), count = item[2] }
+    end
+    return out
+end
+
+--- NPCs friendly to `faction` that sell an item, as actors with spawns.
+function QuestieData.GetVendors(itemID, faction)
+    local result = {}
+    for _, npcID in ipairs(get("Item", itemID, "vendors") or {}) do
+        if friendlyTo(npcID, faction) then
+            result[#result + 1] = {
+                kind = "npc", id = npcID,
+                name = get("Npc", npcID, "name") or ("NPC " .. npcID),
+                points = spawnsOf("Npc", npcID),
+            }
+        end
+    end
+    return result
+end
+
 function QuestieData.GetStarters(questID, faction)
     return actors(questID, "startedBy", faction)
 end

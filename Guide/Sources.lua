@@ -313,6 +313,8 @@ local function objectiveStep(ctx, questID, quest)
     for _, objective in ipairs(open) do
         lines[#lines + 1] = "  " .. objective
     end
+    -- Items you could buy instead of farming.
+    for _, tip in ipairs(ns.Market.Tips(ctx, questID, open)) do lines[#lines + 1] = "  " .. tip end
     if #open == 0 then
         -- No counters to show (go somewhere, find someone, use an item):
         -- say what the quest asks instead.

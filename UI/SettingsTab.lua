@@ -67,6 +67,14 @@ local CHECKBOXES = {
         set = function(v) ns.MinimapRoute.SetEnabled(v) end,
     },
     {
+        label = "SETTING_BUY_TIPS",
+        get = function() return ns.Settings.account.guide.buyTips ~= false end,
+        set = function(v)
+            ns.Settings.account.guide.buyTips = v and true or false
+            ns.Engine.RequestReplan()
+        end,
+    },
+    {
         label = "SETTING_MAP_NUMBERS",
         get = function() return ns.Settings.account.guide.mapNumbers ~= false end,
         set = function(v) ns.MapPins.SetEnabled(v) end,
