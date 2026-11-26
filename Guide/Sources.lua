@@ -516,7 +516,9 @@ function Sources.DoableQuests(ctx)
             doable[#doable + 1] = questID
         end
     end
-    return Sources.ResolveNeeds(ctx, Sources.FilterByRate(doable, ctx)), false
+    -- Earlier quests go in first, so the XP-per-minute filter weighs them too.
+    local resolved = Sources.ResolveNeeds(ctx, doable)
+    return Sources.FilterByRate(resolved, ctx), false
 end
 
 --- Speedrun: XP per minute for each quest (QuestValue), and drop quests
