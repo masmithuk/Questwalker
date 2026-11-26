@@ -625,12 +625,14 @@ local function availableSteps(ctx, out)
         if passBy and not (f.dist and f.dist <= PASS_BY_RANGE) then f = nil end
         if f then
             local name = data.GetQuestName(f.questID) or ("quest " .. f.questID)
-            local line = "Accept: " .. name
+            local lines = { "Accept: " .. name }
+            -- Anything it needs first, so "nothing to pick up" makes sense.
+            for _, need in ipairs(data.Requirements(f.questID, ctx)) do lines[#lines + 1] = "  " .. need end
             out[#out + 1] = {
                 key = "accept:" .. f.questID,
                 kind = "ACCEPT",
                 title = "Talk to " .. f.actor.name,
-                lines = { line },
+                lines = lines,
                 questIDs = { f.questID },
                 actor = f.actor.kind .. ":" .. f.actor.id,
                 target = target(f.point, f.actor.name),

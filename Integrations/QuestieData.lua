@@ -766,6 +766,115 @@ end
 
 --- What QuestieDB knows about a quest: { id, name, level, requiredLevel,
 --- zone }. Works for unknown quests too (name "Quest <id>", level 0).
+local SKILL_NAMES = {
+    [129] = "First Aid", [164] = "Blacksmithing", [165] = "Leatherworking", [171] = "Alchemy",
+    [182] = "Herbalism", [185] = "Cooking", [186] = "Mining", [197] = "Tailoring", [202] = "Engineering",
+    [333] = "Enchanting", [356] = "Fishing", [393] = "Skinning", [633] = "Lockpicking", [762] = "Riding",
+}
+local STANDINGS = { { 42000, "Exalted" }, { 21000, "Revered" }, { 9000, "Honored" }, { 3000, "Friendly" }, { 0, "Neutral" } }
+local SEASONAL_SORT = -22
+
+local function standingName(value)
+    for _, s in ipairs(STANDINGS) do
+        if value >= s[1] then return s[2] end
+    end
+    return "Neutral"
+end
+
+--- Your rank in a profession or skill, or nil if you don't have it.
+local function skillRank(skillName)
+    if not (GetNumSkillLines and GetSkillLineInfo) then return nil end
+    for i = 1, GetNumSkillLines() do
+        local name, isHeader, _, rank = GetSkillLineInfo(i)
+        if not isHeader and name == skillName then return rank or 0 end
+    end
+    return nil
+end
+
+local function questNames(ids)
+    local names = {}
+    for _, id in ipairs(ids) do names[#names + 1] = QuestieData.GetQuestName(id) or ("quest " .. id) end
+    return table.concat(names, ", ")
+end
+
+--- What a quest needs before its giver will offer it, as short lines for
+--- the player ("Finish Wanted: Lieutenant Fangore first", "Needs Cooking
+--- 50"). Only requirements that aren't met, or can't be checked, are
+--- listed. Empty when there's nothing known.
+-- @param ctx { isCompleted(id), log } (as for IsDoable)
+function QuestieData.Requirements(questID, ctx)
+    local out = {}
+    if not QuestieData.IsReady() then return out end
+    local L = ns.L
+    local done = ctx and ctx.isCompleted or ns.GameApi.IsQuestCompleted
+    local log = ctx and ctx.log or {}
+
+    local group = get("Quest", questID, "preQuestGroup")
+    if type(group) == "table" then
+        local missing = {}
+        for _, id in ipairs(group) do if not done(id) then missing[#missing + 1] = id end end
+        if #missing > 0 then out[#out + 1] = L.NEEDS_QUESTS_FMT:format(questNames(missing)) end
+    end
+    local single = get("Quest", questID, "preQuestSingle")
+    if type(single) == "table" and #single > 0 then
+        local any = false
+        for _, id in ipairs(single) do if done(id) then any = true; break end end
+        if not any then
+            out[#out + 1] = (#single == 1 and L.NEEDS_QUESTS_FMT or L.NEEDS_ONE_OF_FMT):format(questNames(single))
+        end
+    end
+
+    local skill = get("Quest", questID, "requiredSkill")
+    if type(skill) == "table" and skill[1] then
+        local name = SKILL_NAMES[skill[1]] or ("skill " .. skill[1])
+        local need = skill[2] or 1
+        local have = skillRank(name)
+        if not have or have < need then out[#out + 1] = L.NEEDS_SKILL_FMT:format(name, need) end
+    end
+
+    local rep = get("Quest", questID, "requiredMinRep")
+    if type(rep) == "table" and rep[1] then
+        local name, value = nil, nil
+        if GetFactionInfoByID then
+            local fname, _, _, _, _, barValue = GetFactionInfoByID(rep[1])
+            name, value = fname, barValue
+        end
+        if not value or value < (rep[2] or 0) then
+            out[#out + 1] = L.NEEDS_REP_FMT:format(standingName(rep[2] or 0), name or ("faction " .. rep[1]))
+        end
+    end
+
+    local spell = get("Quest", questID, "requiredSpell")
+    if type(spell) == "number" and spell > 0 then
+        local known = (IsPlayerSpell and IsPlayerSpell(spell)) or (IsSpellKnown and IsSpellKnown(spell))
+        if not known then
+            local name = GetSpellInfo and GetSpellInfo(spell)
+            out[#out + 1] = L.NEEDS_SPELL_FMT:format(name or ("spell " .. spell))
+        end
+    end
+
+    local items = get("Quest", questID, "requiredSourceItems")
+    if type(items) == "table" then
+        for _, item in ipairs(items) do
+            if not (GetItemCount and GetItemCount(item) > 0) then
+                out[#out + 1] = L.NEEDS_ITEM_FMT:format(get("Item", item, "name") or ("item " .. item))
+            end
+        end
+    end
+
+    local exclusive = get("Quest", questID, "exclusiveTo")
+    if type(exclusive) == "table" then
+        local blocking = {}
+        for _, id in ipairs(exclusive) do
+            if log[id] or done(id) then blocking[#blocking + 1] = id end
+        end
+        if #blocking > 0 then out[#out + 1] = L.NEEDS_NOT_WITH_FMT:format(questNames(blocking)) end
+    end
+
+    if get("Quest", questID, "zoneOrSort") == SEASONAL_SORT then out[#out + 1] = L.NEEDS_HOLIDAY end
+    return out
+end
+
 --- The quest's own "what to do" text (its objectives summary), or nil.
 function QuestieData.ObjectiveText(questID)
     if not QuestieData.IsReady() then return nil end

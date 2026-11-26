@@ -632,7 +632,7 @@ function Engine.NoteOffered(npcID, offered)
     local char = charGuide()
     local log = Engine.state.log or {}
     local actor = "npc:" .. npcID
-    local missing, names = {}, {}
+    local missing, names, needs = {}, {}, {}
     for _, step in ipairs(Engine.state.steps) do
         if step.actor == actor and step.kind == "ACCEPT" then
             for _, id in ipairs(step.questIDs or {}) do
@@ -640,6 +640,9 @@ function Engine.NoteOffered(npcID, offered)
                     and not ns.GameApi.IsQuestCompleted(id) then
                     missing[#missing + 1] = id
                     names[#names + 1] = ns.QuestieData.GetQuestName(id) or ("quest " .. id)
+                    for _, need in ipairs(ns.QuestieData.Requirements(id, { log = log })) do
+                        needs[#needs + 1] = need
+                    end
                 end
             end
         end
@@ -647,15 +650,62 @@ function Engine.NoteOffered(npcID, offered)
     if #missing == 0 then return missing end
     local level = ns.Character.Detect().level
     for _, id in ipairs(missing) do char.notOffered[id] = level end
-    ns.Util.Print(ns.L.NOT_OFFERED_FMT:format(table.concat(names, ", ")))
+    if #needs > 0 then
+        ns.Util.Print(ns.L.NOT_OFFERED_NEEDS_FMT:format(table.concat(names, ", "), table.concat(needs, "; ")))
+    else
+        ns.Util.Print(ns.L.NOT_OFFERED_FMT:format(table.concat(names, ", ")))
+    end
     invalidateDoable()
     Engine.state.currentKey = nil
     Engine.RequestReplan()
     return missing
 end
 
+-- Standing at a quest giver who has nothing to say opens no window at all,
+-- so the guide can't see the quest isn't there. If you're next to the
+-- step's quest giver, with them targeted, and nothing opens for a while,
+-- the quests are treated as not offered yet.
+local SILENT_RANGE = 8      -- yards
+local SILENT_SECONDS = 8
+local silent = { npc = nil, seconds = 0 }
+
+local function npcIdOf(unit)
+    local guid = UnitGUID and UnitGUID(unit)
+    if type(guid) ~= "string" then return nil end
+    local kind, _, _, _, _, id = strsplit("-", guid)
+    if kind ~= "Creature" then return nil end
+    return tonumber(id)
+end
+
+--- Called about once a second (and from tests).
+function Engine.CheckSilentGiver(dt)
+    local step = Engine.state.steps and Engine.state.steps[1]
+    local npc = npcIdOf("target")
+    local here = ns.GameApi.GetPlayerPosition()
+    local world = here and ns.GameApi.GetWorldPosition(here.mapID, here.x, here.y)
+    local at = step and step.kind == "ACCEPT" and step.actor == ("npc:" .. tostring(npc))
+        and step.target and step.target.world and world
+        and ns.Util.Distance(world, step.target.world) <= SILENT_RANGE
+    if not at then
+        silent.npc, silent.seconds = nil, 0
+        return
+    end
+    if silent.npc ~= npc then silent.npc, silent.seconds = npc, 0 end
+    silent.seconds = silent.seconds + (dt or 1)
+    if silent.seconds >= SILENT_SECONDS then
+        silent.npc, silent.seconds = nil, 0
+        Engine.NoteOffered(npc, {})
+    end
+end
+
+--- A window opened with the NPC: they're talking, so start again.
+local function heard()
+    silent.npc, silent.seconds = nil, 0
+end
+
 local function onQuestList(kind)
     return function()
+        heard()
         local activeList, availableList = ns.AutoQuest.ReadOffers(kind)
         local offered = {}
         for _, q in ipairs(activeList) do if q.questID then offered[q.questID] = true end end
@@ -669,6 +719,17 @@ function Engine.Start()
     -- enough to tell, as more may follow).
     ns:RegisterEvent("GOSSIP_SHOW", onQuestList("gossip"))
     ns:RegisterEvent("QUEST_GREETING", onQuestList("greeting"))
+    ns:RegisterEvent("QUEST_DETAIL", heard)
+    ns:RegisterEvent("MERCHANT_SHOW", heard)
+    -- Quest givers who say nothing at all.
+    local silentWatch = CreateFrame("Frame")
+    local elapsed = 0
+    silentWatch:SetScript("OnUpdate", function(_, dt)
+        elapsed = elapsed + (dt or 0)
+        if elapsed < 1 then return end
+        Engine.CheckSilentGiver(elapsed)
+        elapsed = 0
+    end)
     -- A new level can make those quests available.
     ns:RegisterEvent("PLAYER_LEVEL_UP", function() charGuide().notOffered = {} end)
     ns:RegisterEvent("QUEST_TURNED_IN", function(_, questID)

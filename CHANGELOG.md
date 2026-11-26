@@ -2,6 +2,13 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.7] - 2026-11-26
+
+### Fixed
+- **Quests that need something first.** A pick-up step now lists anything the quest needs that you don't have yet: an earlier quest ("Needs: finish ... first"), a profession level, reputation, a spell, an item in your bags, a quest it can't be taken with, or a holiday event.
+- **Quest givers with nothing to say.** Talking to an NPC who has nothing for you opens no window, so the guide kept sending you back. If you stand next to the step's quest giver with them targeted and nothing opens for 8 seconds, the guide treats the quest as not offered yet and moves on. It checks again when you level up.
+- **The "not offered" message says why** when the reason is known, instead of guessing.
+
 ## [0.9.6] - 2026-11-25
 
 ### Fixed
