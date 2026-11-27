@@ -56,20 +56,12 @@ local function charGuide() return ns.Settings.char.guide end
 -- What the navigator remembers
 ---------------------------------------------------------------------------
 
-local function npcIdOf(unit)
-    local guid = UnitGUID and UnitGUID(unit)
-    if type(guid) ~= "string" then return nil end
-    local kind, _, _, _, _, id = strsplit("-", guid)
-    if kind ~= "Creature" then return nil end
-    return tonumber(id)
-end
-
 --- Remember flight masters: the one you're talking to, and those whose
 --- zone matches a discovered node on the flight map.
 function Navigator.OnTaxiMap()
     local known = charGuide().flights or {}
     charGuide().flights = known
-    local npc = npcIdOf("npc")
+    local npc = ns.GameApi.GetNpcID("npc")
     if npc then known[npc] = true end
     local masters = ns.QuestieData.IsReady() and ns.QuestieData.GetFlightMasters(ns.Character.Detect().faction) or {}
     -- Each discovered node on the flight map, matched to the flight master
@@ -322,12 +314,13 @@ local function create()
     f.detail:SetJustifyH("LEFT")
     f.detail:SetTextColor(0.8, 0.8, 0.8)
 
+    local draw = ns.Util.Protect("Questwalker arrow", function() Navigator.Draw() end)
     f:SetScript("OnUpdate", function(_, dt)
         f.elapsed = (f.elapsed or 0) + (dt or 0)
         sinceReplan = sinceReplan + (dt or 0)
         if f.elapsed < DRAW_EVERY then return end
         f.elapsed = 0
-        Navigator.Draw()
+        draw()
     end)
     return f
 end

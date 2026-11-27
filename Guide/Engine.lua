@@ -672,18 +672,15 @@ local SILENT_RANGE = 8      -- yards
 local SILENT_SECONDS = 8
 local silent = { npc = nil, seconds = 0 }
 
-local function npcIdOf(unit)
-    local guid = UnitGUID and UnitGUID(unit)
-    if type(guid) ~= "string" then return nil end
-    local kind, _, _, _, _, id = strsplit("-", guid)
-    if kind ~= "Creature" then return nil end
-    return tonumber(id)
-end
-
 --- Called about once a second (and from tests).
 function Engine.CheckSilentGiver(dt)
+    -- No quest givers to wait on in dungeons, and the game hides targets there.
+    if ns.GameApi.InInstance() then
+        silent.npc, silent.seconds = nil, 0
+        return
+    end
     local step = Engine.state.steps and Engine.state.steps[1]
-    local npc = npcIdOf("target")
+    local npc = ns.GameApi.GetNpcID("target")
     local here = ns.GameApi.GetPlayerPosition()
     local world = here and ns.GameApi.GetWorldPosition(here.mapID, here.x, here.y)
     local at = step and step.kind == "ACCEPT" and step.actor == ("npc:" .. tostring(npc))
@@ -727,11 +724,13 @@ function Engine.Start()
     -- Quest givers who say nothing at all.
     local silentWatch = CreateFrame("Frame")
     local elapsed = 0
+    local check = ns.Util.Protect("silent quest giver check", Engine.CheckSilentGiver)
     silentWatch:SetScript("OnUpdate", function(_, dt)
         elapsed = elapsed + (dt or 0)
         if elapsed < 1 then return end
-        Engine.CheckSilentGiver(elapsed)
-        elapsed = 0
+        local spent = elapsed
+        elapsed = 0 -- reset first, so a failure can't repeat every frame
+        check(spent)
     end)
     -- A new level can make those quests available.
     ns:RegisterEvent("PLAYER_LEVEL_UP", function() charGuide().notOffered = {} end)
@@ -769,7 +768,7 @@ function Engine.Start()
     invalidateDoable()
     buildIndex()
     if not ticker and C_Timer.NewTicker then
-        ticker = C_Timer.NewTicker(TICK_INTERVAL, onTick)
+        ticker = C_Timer.NewTicker(TICK_INTERVAL, ns.Util.Protect("guide", onTick))
     end
     Engine.RequestReplan()
 end

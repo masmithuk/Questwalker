@@ -70,14 +70,28 @@ function GameApi.GetQuestLog()
     return log
 end
 
---- The creature ID of the NPC you're talking to ("npc" unit), or nil.
---- GUIDs look like "Creature-0-1465-0-2105-211022-0000ABCDEF".
-function GameApi.GetDialogNpcID()
-    local guid = ns.Util.SafeString(safe(UnitGUID, "npc"))
+--- The creature ID of a unit ("npc", "target"...), or nil. GUIDs look like
+--- "Creature-0-1465-0-2105-211022-0000ABCDEF". Inside instances the game
+--- hides GUIDs from addons ("secret" values that error when read), so
+--- those give nil.
+function GameApi.GetNpcID(unit)
+    local guid = ns.Util.SafeString(safe(UnitGUID, unit))
     if not guid then return nil end
     local kind, _, _, _, _, id = strsplit("-", guid)
     if kind ~= "Creature" then return nil end
     return tonumber(id)
+end
+
+--- The creature ID of the NPC you're talking to ("npc" unit), or nil.
+function GameApi.GetDialogNpcID()
+    return GameApi.GetNpcID("npc")
+end
+
+--- Are you inside a dungeon, raid, battleground or arena?
+function GameApi.InInstance()
+    local ok, inside, kind = pcall(IsInInstance)
+    if not ok then return false end
+    return inside == true and kind ~= "none"
 end
 
 --- Abandon a quest in the log (as the quest log's Abandon button does).

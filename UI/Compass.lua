@@ -117,8 +117,10 @@ function Compass.PartyPositions(mapID)
             if ok and vec then x, y = vec:GetXY() end
             local world = x and y and ns.GameApi.GetWorldPosition(mapID, x, y)
             if world then
+                -- Names and classes can be hidden ("secret") in some places.
                 local _, class = UnitClass(unit)
-                out[#out + 1] = { unit = unit, name = UnitName(unit), class = class, world = world }
+                out[#out + 1] = { unit = unit, name = ns.Util.SafeString(UnitName(unit)),
+                    class = ns.Util.SafeString(class), world = world }
             end
         end
     end
@@ -285,11 +287,12 @@ local function create()
     end
 
     local elapsed = 0
+    local draw = ns.Util.Protect("compass", function() Compass.Draw() end)
     f:SetScript("OnUpdate", function(_, dt)
         elapsed = elapsed + (dt or 0)
         if elapsed < UPDATE_EVERY then return end
         elapsed = 0
-        Compass.Draw()
+        draw()
     end)
     return f
 end

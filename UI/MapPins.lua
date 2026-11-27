@@ -361,6 +361,7 @@ local function hook()
     -- Zooming and map changes are cheap to spot, so check while it's open.
     local watcher = CreateFrame("Frame", nil, map)
     local elapsed = 0
+    local draw = ns.Util.Protect("world map numbers", function() MapPins.Draw() end)
     watcher:SetScript("OnUpdate", function(_, dt)
         elapsed = elapsed + (dt or 0)
         if elapsed < 0.1 then return end
@@ -369,7 +370,8 @@ local function hook()
         local scale = scroll and scroll.GetCanvasScale and scroll:GetCanvasScale() or 1
         local width = scroll and scroll.Child and scroll.Child:GetWidth()
         if drawn.dirty or mapID ~= drawn.mapID or scale ~= drawn.scale or width ~= drawn.width then
-            MapPins.Draw()
+            drawn.dirty = false -- even if drawing fails, don't retry every tick
+            draw()
         end
     end)
 end

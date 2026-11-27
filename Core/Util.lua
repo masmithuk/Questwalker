@@ -37,6 +37,29 @@ function Util.SafeNumber(value)
     return value
 end
 
+--- Wrap a function that runs over and over (every frame or second) so a
+--- failure can't flood the game with errors: the first error is reported
+--- (once, through the game's error handler), then the function is paused
+--- for PROTECT_PAUSE seconds before it's tried again.
+Util.PROTECT_PAUSE = 30
+function Util.Protect(label, fn)
+    local pausedUntil, reported = 0, false
+    return function(...)
+        local now = GetTime and GetTime() or 0
+        if now < pausedUntil then return end
+        local ok, err = pcall(fn, ...)
+        if not ok then
+            pausedUntil = now + Util.PROTECT_PAUSE
+            if not reported then
+                reported = true
+                local handler = geterrorhandler and geterrorhandler()
+                local message = ("Questwalker %s: %s"):format(label, tostring(err))
+                if handler then pcall(handler, message) else print(message) end
+            end
+        end
+    end
+end
+
 --- Same as SafeNumber but for strings.
 function Util.SafeString(value)
     if issecretvalue and issecretvalue(value) then

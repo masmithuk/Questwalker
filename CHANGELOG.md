@@ -2,6 +2,13 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.10] - 2026-11-27
+
+### Fixed
+- **Error flood in dungeons (could crash the game).** The check for quest givers with nothing to say (added in 0.9.7) read your target, which the game hides from addons inside dungeons. It errored, and because its timer only reset after a successful run, it then failed on every frame: thousands of errors a minute. It now skips dungeons, and reads targets safely everywhere.
+- **Nothing can repeat an error every frame any more.** Everything Questwalker runs over and over (the guide's timer, the arrow, the compass, the world map numbers, the quest giver check) now reports its first error once and then pauses for 30 seconds, instead of retrying non-stop.
+- The compass leaves out party names and classes when the game hides them.
+
 ## [0.9.9] - 2026-11-26
 
 ### Changed
