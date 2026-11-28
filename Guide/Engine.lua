@@ -61,7 +61,7 @@ local function currentOrigin()
 end
 
 --- Maps where the guide may suggest new quests: your guide's zones for
---- your level, plus where you stand.
+--- your level (where you stand only if it names none).
 local function allowedMaps(plan, playerMapID)
     return ns.Sources.AllowedMaps(plan, playerMapID)
 end

@@ -20,12 +20,17 @@ function fixtures.durotar(mock, opts)
     -- By default, follow a test guide that keeps every quest in range, so
     -- tests aren't about Speedrun/Story filtering. Mode tests set opts.mode.
     if opts.mode then
+        -- Built-in guides start you in your race's zone: the test world is
+        -- Durotar, so be an Orc.
+        mock.player.race = { "Orc", "Orc", 2 }
         QuestwalkerCharDB.routeId = opts.mode
     else
         QuestwalkerDB.guides["custom-test-all"] = {
             format = "Questwalker guide", version = 2, name = "Test Everything", basedOn = "story",
             rules = { greyGap = 10, sidePenalty = 0, chainBonus = 150 },
-            bands = { { levels = { 1, 60 }, zones = { "START" } } },
+            -- The test world is Durotar (the test character is Undead, so
+            -- "START" alone would mean Tirisfal).
+            bands = { { levels = { 1, 60 }, zones = { "START", "Durotar" } } },
         }
         if mock.ns and mock.ns.Library then mock.ns.Library.Init() end
         QuestwalkerCharDB.routeId = "custom-test-all"

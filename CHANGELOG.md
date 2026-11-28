@@ -2,6 +2,12 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.11] - 2026-11-28
+
+### Fixed
+- **Wandering off no longer takes the guide with you.** New quests used to come from your guide's zones *and* wherever you were standing, so a level 2 human in Stormwind was given Stormwind's quests instead of being sent back to Northshire. New quests now come only from the guide's zones for your level. Where you stand still counts for handing in finished quests and for grinding.
+- **Quests that can't be picked up aren't suggested.** Questie's own hidden-quest list is now respected, and a short list of quests that can't be picked up on WoW Forever is skipped too (starting with Stormwind Library).
+
 ## [0.9.10] - 2026-11-27
 
 ### Fixed

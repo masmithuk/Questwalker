@@ -149,8 +149,22 @@ local UNCHECKED_REQUIREMENTS = {
 
 --- Can the character pick up this quest right now?
 -- @param ctx { level, faction, log, isCompleted(id) }
+--- Quests that can't be picked up at all: Questie's hidden list (where
+--- Questie is running) and Data/Unavailable.lua.
+function QuestieData.IsUnavailable(questID)
+    if ns.Data.UnavailableQuests and ns.Data.UnavailableQuests[questID] then return true end
+    local loader = _G.QuestieLoader
+    if type(loader) == "table" and type(loader.ImportModule) == "function" then
+        local ok, corrections = pcall(loader.ImportModule, loader, "QuestieCorrections")
+        local hidden = ok and type(corrections) == "table" and corrections.hiddenQuests
+        if type(hidden) == "table" and hidden[questID] then return true end
+    end
+    return false
+end
+
 function QuestieData.IsDoable(questID, ctx)
     if ctx.log[questID] or ctx.isCompleted(questID) then return false end
+    if QuestieData.IsUnavailable(questID) then return false end
 
     local fromQuestie = questieIsDoable(questID)
     if fromQuestie ~= nil then return fromQuestie end

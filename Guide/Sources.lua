@@ -58,16 +58,22 @@ local function target(point, label)
     return { mapID = point.mapID, x = point.x, y = point.y, world = worldOf(point) or nil, label = label }
 end
 
---- Maps the guide may send you to for new quests.
+--- Maps the guide may send you to for new quests: the guide's zones for
+--- your level. Where you happen to be doesn't count (a level 2 human in
+--- Stormwind is sent back to Northshire, not given Stormwind's quests);
+--- only when the guide names no zones at all is your own map used.
 function Sources.AllowedMaps(plan, playerMapID)
-    local allowed = {}
-    if playerMapID then allowed[playerMapID] = true end
+    local allowed, any = {}, false
     if plan and plan.current then
         for _, zone in ipairs(plan.current.zones) do
             local mapID = ns.ZoneMap.MapIdByName(zone)
-            if mapID then allowed[mapID] = true end
+            if mapID then
+                allowed[mapID] = true
+                any = true
+            end
         end
     end
+    if not any and playerMapID then allowed[playerMapID] = true end
     return allowed
 end
 
@@ -361,7 +367,9 @@ function Sources.TooLowLevel(ctx, questID, quest, turnIn)
     if not tooLow then return nil end
     if quest.complete then
         local mapID = turnIn and turnIn.target and turnIn.target.mapID
-        if mapID and (not ctx.allowedMaps or ctx.allowedMaps[mapID]) then return nil end -- on the way
+        if mapID and (not ctx.allowedMaps or ctx.allowedMaps[mapID] or mapID == ctx.playerMapID) then
+            return nil -- on the way (your guide's zones, or the map you're on)
+        end
     end
     return qLevel
 end
@@ -1064,7 +1072,11 @@ local function grindStep(ctx, out)
     if goal <= level then goal = level + 1 end
     goal = math.min(goal, ns.Util.MAX_LEVEL)
 
-    local mobs = data.GrindMobs(level - 1, level + 2, ctx.allowedMaps)
+    -- Grind in the guide's zones or right where you are.
+    local grindMaps = {}
+    for mapID in pairs(ctx.allowedMaps or {}) do grindMaps[mapID] = true end
+    if ctx.playerMapID then grindMaps[ctx.playerMapID] = true end
+    local mobs = data.GrindMobs(level - 1, level + 2, grindMaps)
     local actor, point = nearestActor(ctx.origin, mobs)
     local xp = ns.Advisor.GetXpInfo(level)
     local need = Experience.XPToReach(level, goal, xp.xp, xp.xpMax)
