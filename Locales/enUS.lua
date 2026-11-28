@@ -238,21 +238,17 @@ L.AUTO_CHOOSE_REWARD     = "Pick your reward - Questwalker never chooses between
 L.AUTO_COSTS_GOLD        = "This quest costs gold to complete, so Questwalker left it to you."
 
 -- Target button
-L.TARGET_FMT            = "Target: %s"
-L.TARGET_CYCLE_FMT      = "Target: %s (%d/%d)"
-L.TARGET_TOOLTIP_TITLE  = "Target nearest quest mob"
-L.TARGET_TOOLTIP_BODY   = "Click: target the nearest creature you still need for a quest. Click again: "
-    .. "the next one of that kind. Right-click: the next kind of creature (the numbers). "
-    .. "Works in combat; the list refreshes when combat ends. Bind keys under Key Bindings > AddOns > "
-    .. "Questwalker (without Shift). Shift + left-drag to move."
+L.TARGET_HINT           = "Click: the nearest one. Click again: the next one. Shift-drag to move."
+L.TARGET_HINT_GROUP     = "Click: the nearest one. Click again: the next of that kind. Right-click: the next kind "
+    .. "(> marks it). Shift-drag to move."
 L.SETTING_TARGET        = "Show the Target button (nearest quest mob)"
 
 -- Key bindings menu (globals the game reads)
 _G.BINDING_HEADER_QUESTWALKER = "Questwalker"
 _G["BINDING_NAME_CLICK QuestwalkerTargetButton:LeftButton"] = "Target nearest quest mob (again: the next one)"
-_G["BINDING_NAME_CLICK QuestwalkerTargetButton:RightButton"] = "Target the next kind of quest mob"
+_G["BINDING_NAME_CLICK QuestwalkerTargetButton:RightButton"] = "Target the next kind in the first group"
 for i = 2, 6 do
-    _G["BINDING_NAME_CLICK QuestwalkerTargetButton" .. i .. ":LeftButton"] = "Target quest mob " .. i
+    _G["BINDING_NAME_CLICK QuestwalkerTargetButton" .. i .. ":LeftButton"] = "Target quest mob group " .. i
 end
 
 -- Minimap button

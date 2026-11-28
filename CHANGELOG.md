@@ -5,7 +5,8 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ## [0.9.12] - 2026-11-28
 
 ### Changed
-- **The Target button steps through the creatures around you.** Click to target the nearest creature you need; click again to move to the next one of that kind nearby, and so on. Before, each click jumped to a different kind of creature, so you never got past the first of each. Right-click (or the new "Target the next kind of quest mob" key binding) switches to the next kind, nearest kind first.
+- **Target icons.** The long Target buttons are now a row of small icons, one per group of creatures, with similar kinds sharing one (Forest Spiders and Venom Web Spiders on one spider icon; Defias Trappers and Smugglers on one). Each has a short label and, for a group, how many kinds it covers. Click targets the nearest; right-click goes to the next kind in that group. Hover for the kinds and your progress on each.
+- **The Target button steps through the creatures around you.** Click to target the nearest creature you need; click again to move to the next one of that kind nearby, and so on. Before, each click jumped to a different kind of creature, so you never got past the first of each. Right-click switches to the next kind of creature in that group.
 
 ## [0.9.11] - 2026-11-28
 

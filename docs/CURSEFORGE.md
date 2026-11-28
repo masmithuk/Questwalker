@@ -32,9 +32,9 @@ you're in. Pick up, do, hand in, repeat, all the way to 60.
   order. Hover a number to see what to do and how far away it is. Your party members show up on it too.
 - **Numbered steps on the world map:** see where each of your next steps is, in order. Where you need to kill
   things, the area they live in is shaded. Hover a number to see what it is.
-- **Target button.** Click it to target the nearest creature you need for your current quest, and keep
-  clicking to go through the others of that kind. Right-click for the next kind of creature. With several kinds,
-  there's also a button for each.
+- **Target icons.** A small icon for each kind of creature your current quests need, with similar ones grouped
+  (all the spiders on one icon). Click to target the nearest, click again for the next one, right-click for
+  the next kind in the group.
 - **Elite tips:** when a quest needs an elite, it tells you if there are guards close enough to pull it to, or to
   find a group.
 - **Class quests come first.** Quests for your class (new spells, totems, forms and pets) are never skipped,

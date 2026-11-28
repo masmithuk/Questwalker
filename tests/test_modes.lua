@@ -192,7 +192,7 @@ return {
         ns.Engine.FocusQuest(101)
         T.eq(ns.TargetButton.GetMacro(), "/targetexact Vile Familiar")
         T.truthy(QuestwalkerTargetButton:IsShown())
-        T.contains(QuestwalkerTargetButton:GetText(), "Vile Familiar")
+        T.eq(QuestwalkerTargetButton.label:GetText(), "Vile Familiar")
     end },
 
     { "finished kill objectives and hand-ins aren't targeted", function(T)

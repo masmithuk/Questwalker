@@ -89,6 +89,8 @@ function Frame:GetScript(name) return self.scripts[name] end
 function Frame:Show() self.shown = true; if self.scripts.OnShow then self.scripts.OnShow(self) end end
 function Frame:Hide() self.shown = false; if self.scripts.OnHide then self.scripts.OnHide(self) end end
 function Frame:IsShown() return self.shown end
+function Frame:SetTexture(t) rawset(self, "texture", t) end
+function Frame:GetTexture() return rawget(self, "texture") end
 function Frame:SetChecked(v) rawset(self, "checked", v and true or false) end
 function Frame:GetChecked() return rawget(self, "checked") == true end
 function Frame:SetText(t) self.textValue = t end

@@ -28,15 +28,18 @@
       * Shift is reserved for moving: Shift + left-drag moves the button and
         a Shift-click doesn't target anything.
 
-    It is its own small frame rather than part of the guide window: a
-    protected button inside the guide window would stop that window from
-    resizing during combat.
-
-    Several creatures (e.g. a group of quests in the same area): the main
-    button still cycles through all of them, and one extra button per
-    creature appears underneath it (QuestwalkerTargetButton2..6), each
-    targeting just that creature. They follow the main button when it's
-    moved, and can have their own key bindings.
+    The buttons are small icons in a row, one per group of creatures: kinds
+    that share their last word ("Forest Spider", "Venom Web Spider":
+    Spiders) or a first word that isn't just describing them ("Defias
+    Trapper", "Defias Smuggler": Defias). Each shows the group's icon, a
+    short label underneath and, for a group of several kinds, how many.
+    Right-click goes to the next kind in that group. Hover for the kinds,
+    their progress and which one a click targets. The first button
+    (QuestwalkerTargetButton) is the nearest group; the others
+    (QuestwalkerTargetButton2..6) line up to its right and have their own
+    key bindings. They're their own small frames rather than part of the
+    guide window: protected buttons inside the guide window would stop that
+    window from resizing during combat.
 
     The creature list (pure; tested):
       * only the guide's current step, and only when it's a "complete
@@ -57,13 +60,14 @@ local L = ns.L
 
 local FRAME_NAME = "QuestwalkerTargetButton" -- referenced by Bindings.xml
 local MAX_TARGETS = 8
-local MAX_EXTRA = 5 -- extra per-creature buttons (2nd to 6th creature)
+local MAX_EXTRA = 5 -- extra group buttons (2nd to 6th group)
 
 local extras = {} -- per-creature buttons, created on first need
 
 local button, header
 local pendingList     -- chosen in combat, applied after
 local appliedKey      -- signature of the list on the button
+local lastNames       -- every creature on the buttons, nearest first
 
 -- Runs in the secure (restricted) environment before every click.
 -- `self` is the button; returning false cancels the click.
@@ -120,6 +124,135 @@ local function collectForQuest(questID, origin, found)
     end
 end
 
+---------------------------------------------------------------------------
+-- Grouping (pure)
+---------------------------------------------------------------------------
+
+-- Words that describe a creature rather than say what it is, so they
+-- don't make two creatures the same kind ("Young Wolf", "Young Boar").
+local DESCRIBING = {
+    young = true, elder = true, old = true, greater = true, lesser = true, large = true, small = true,
+    giant = true, dark = true, black = true, grey = true, gray = true, white = true, red = true,
+    green = true, blue = true, mottled = true, rabid = true, wild = true, feral = true, savage = true,
+    frenzied = true, corrupted = true, diseased = true, plagued = true, starving = true, mangy = true,
+    forest = true, mountain = true, venom = true, cave = true, rock = true, timber = true,
+}
+
+-- Icons for kinds of creature (a word in the group's name). The first
+-- match wins; anything else gets a crosshair.
+local ICONS = {
+    { "spider", "Interface\\Icons\\Spell_Nature_Web" },
+    { "wolf", "Interface\\Icons\\Ability_Hunter_Pet_Wolf" },
+    { "worg", "Interface\\Icons\\Ability_Hunter_Pet_Wolf" },
+    { "boar", "Interface\\Icons\\Ability_Hunter_Pet_Boar" },
+    { "bear", "Interface\\Icons\\Ability_Hunter_Pet_Bear" },
+    { "cat", "Interface\\Icons\\Ability_Hunter_Pet_Cat" },
+    { "lion", "Interface\\Icons\\Ability_Hunter_Pet_Cat" },
+    { "panther", "Interface\\Icons\\Ability_Hunter_Pet_Cat" },
+    { "tiger", "Interface\\Icons\\Ability_Hunter_Pet_Cat" },
+    { "prowler", "Interface\\Icons\\Ability_Hunter_Pet_Cat" },
+    { "raptor", "Interface\\Icons\\Ability_Hunter_Pet_Raptor" },
+    { "crocolisk", "Interface\\Icons\\Ability_Hunter_Pet_Crocolisk" },
+    { "gorilla", "Interface\\Icons\\Ability_Hunter_Pet_Gorilla" },
+    { "scorpid", "Interface\\Icons\\Ability_Hunter_Pet_Scorpid" },
+    { "bat", "Interface\\Icons\\Ability_Hunter_Pet_Bat" },
+    { "owl", "Interface\\Icons\\Ability_Hunter_Pet_Owl" },
+    { "crab", "Interface\\Icons\\Ability_Hunter_Pet_Crab" },
+    { "turtle", "Interface\\Icons\\Ability_Hunter_Pet_Turtle" },
+    { "hyena", "Interface\\Icons\\Ability_Hunter_Pet_Hyena" },
+    { "vulture", "Interface\\Icons\\Ability_Hunter_Pet_Vulture" },
+    { "tallstrider", "Interface\\Icons\\Ability_Hunter_Pet_TallStrider" },
+    { "strider", "Interface\\Icons\\Ability_Hunter_Pet_TallStrider" },
+    { "wind serpent", "Interface\\Icons\\Ability_Hunter_Pet_WindSerpent" },
+    { "serpent", "Interface\\Icons\\Ability_Hunter_Pet_WindSerpent" },
+    { "harpy", "Interface\\Icons\\Ability_Hunter_Pet_Vulture" },
+    { "murloc", "Interface\\Icons\\INV_Misc_Head_Murloc_01" },
+    { "kobold", "Interface\\Icons\\INV_Misc_Head_Kobold_01" },
+    { "gnoll", "Interface\\Icons\\INV_Misc_Head_Gnoll_01" },
+    { "troll", "Interface\\Icons\\INV_Misc_Head_Troll_01" },
+    { "orc", "Interface\\Icons\\INV_Misc_Head_Orc_01" },
+    { "skeleton", "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" },
+    { "zombie", "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" },
+    { "ghoul", "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" },
+    { "elemental", "Interface\\Icons\\Spell_Nature_EarthElemental_Totem" },
+    { "ooze", "Interface\\Icons\\INV_Misc_Slime_01" },
+    { "slime", "Interface\\Icons\\INV_Misc_Slime_01" },
+    { "basilisk", "Interface\\Icons\\Ability_Hunter_Pet_Crocolisk" },
+    { "thresher", "Interface\\Icons\\INV_Misc_Fish_02" },
+    { "shark", "Interface\\Icons\\INV_Misc_Fish_02" },
+    { "dragon", "Interface\\Icons\\INV_Misc_Head_Dragon_01" },
+    { "whelp", "Interface\\Icons\\INV_Misc_Head_Dragon_01" },
+    { "drake", "Interface\\Icons\\INV_Misc_Head_Dragon_01" },
+}
+local DEFAULT_ICON = "Interface\\Icons\\Ability_Hunter_SniperShot"
+
+local function words(name)
+    local out = {}
+    for w in name:gmatch("[%a']+") do out[#out + 1] = w:lower() end
+    return out
+end
+
+--- The icon for a kind of creature.
+function TargetButton.IconFor(label)
+    local lower = (label or ""):lower()
+    for _, entry in ipairs(ICONS) do
+        if lower:find(entry[1], 1, true) then return entry[2] end
+    end
+    return DEFAULT_ICON
+end
+
+local function plural(word)
+    if word:sub(-1) == "y" and not word:sub(-2, -2):match("[aeiou]") then return word:sub(1, -2) .. "ies" end
+    if word:sub(-1) == "s" or word:sub(-1) == "x" or word:sub(-2) == "ch" then return word .. "es" end
+    if word:sub(-2) == "lf" then return word:sub(1, -3) .. "lves" end
+    return word .. "s"
+end
+
+local function titleCase(word)
+    return word:sub(1, 1):upper() .. word:sub(2)
+end
+
+--- Put creatures of the same kind together: those sharing their last word
+--- ("Forest Spider", "Venom Web Spider": Spiders), else their first word
+--- when it isn't just describing them ("Defias Trapper", "Defias
+--- Smuggler": Defias). Groups keep the order of their nearest member.
+-- @param names creature names, nearest first
+-- @return list of { label, icon, names }
+function TargetButton.Group(names)
+    local lastOf, firstOf, lastCount, firstCount = {}, {}, {}, {}
+    for _, name in ipairs(names) do
+        local w = words(name)
+        local last, first = w[#w] or name:lower(), w[1] or name:lower()
+        lastOf[name], firstOf[name] = last, first
+        lastCount[last] = (lastCount[last] or 0) + 1
+        if #w > 1 and not DESCRIBING[first] then firstCount[first] = (firstCount[first] or 0) + 1 end
+    end
+    local groups, byKey = {}, {}
+    for _, name in ipairs(names) do
+        local key, label
+        if lastCount[lastOf[name]] > 1 then
+            key = "last:" .. lastOf[name]
+            label = titleCase(plural(lastOf[name]))
+        elseif (firstCount[firstOf[name]] or 0) > 1 then
+            key = "first:" .. firstOf[name]
+            label = titleCase(firstOf[name])
+        else
+            key, label = "name:" .. name, name
+        end
+        local g = byKey[key]
+        if not g then
+            g = { label = label, names = {} }
+            byKey[key] = g
+            groups[#groups + 1] = g
+        end
+        g.names[#g.names + 1] = name
+    end
+    for _, g in ipairs(groups) do
+        g.icon = TargetButton.IconFor(table.concat(g.names, " "))
+    end
+    return groups
+end
+
 --- Creature names to cycle through for the current step, nearest first.
 --- Only a step that sends you to do objectives has targets; turn-ins,
 --- pick-ups and trainer visits leave the button hidden.
@@ -164,72 +297,81 @@ local function restorePosition(f)
     f:SetPoint(saved.point, UIParent, saved.relativePoint, saved.x, saved.y)
 end
 
---- "Target: Vile Familiar (2/4)" for the kind of creature presses target.
-local function updateLabel(b)
+local ICON_SIZE = 34
+local ICON_GAP = 4
+
+--- The creature this button's next left press targets.
+local function currentName(b)
     local count = b:GetAttribute("fp-count") or 0
-    if count == 0 then return end
+    if count == 0 then return nil end
     local index = b:GetAttribute("fp-index") or 0
     if index == 0 then index = 1 end
-    local name = b:GetAttribute("fp-name" .. index)
-    if count > 1 then
-        b:SetText(L.TARGET_CYCLE_FMT:format(name, index, count))
-    else
-        b:SetText(L.TARGET_FMT:format(name))
-    end
+    return b:GetAttribute("fp-name" .. index), index, count
 end
 
-local function create()
-    local b = CreateFrame("Button", FRAME_NAME, UIParent, "SecureActionButtonTemplate,UIPanelButtonTemplate")
-    b:SetSize(220, 24)
+--- Hover: the group, which creature a press targets, and how to use it.
+local function showTooltip(b)
+    if not GameTooltip or not b.group then return end
+    GameTooltip:SetOwner(b, "ANCHOR_TOP")
+    GameTooltip:SetText(b.group.label)
+    local current = currentName(b)
+    for _, name in ipairs(b.group.names) do
+        local progress
+        for _, text in ipairs(b.progress or {}) do
+            if text:find(name, 1, true) then progress = text:match("(%d+%s*/%s*%d+)") end
+        end
+        local line = (name == current and "> " or "  ") .. name .. (progress and ("  " .. progress) or "")
+        if name == current then
+            GameTooltip:AddLine(line, 1, 0.82, 0)
+        else
+            GameTooltip:AddLine(line, 1, 1, 1)
+        end
+    end
+    GameTooltip:AddLine(#b.group.names > 1 and L.TARGET_HINT_GROUP or L.TARGET_HINT, 0.7, 0.7, 0.7, true)
+    GameTooltip:Show()
+end
+
+local function onPostClick(b)
+    if GameTooltip and GameTooltip:IsOwned(b) then showTooltip(b) end
+end
+
+--- One square icon button for a group of creatures. Button 1 is the
+--- one with the saved position and key bindings; the rest line up to its
+--- right and have their own bindings.
+local function createIcon(i)
+    local name = i == 1 and FRAME_NAME or (FRAME_NAME .. i)
+    local b = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
+    b:SetSize(ICON_SIZE, ICON_SIZE)
     b:SetAttribute("type", "macro")
     b:SetAttribute("macrotext", "")
     b:RegisterForClicks("AnyUp", "AnyDown")
-    b:SetMovable(true)
-    b:EnableMouse(true)
-    b:SetClampedToScreen(true)
-    b:RegisterForDrag("LeftButton")
-
-    -- Shift + left-drag moves it (secure frames can only move out of combat).
-    b:SetScript("OnDragStart", function(self)
-        if IsShiftKeyDown() and not ns.GameApi.InCombat() then self:StartMoving() end
-    end)
-    b:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        savePosition(self)
-    end)
-
-    -- Show which creature the *next* press will target.
-    b:HookScript("PostClick", updateLabel)
-
-    b:SetScript("OnEnter", function(self)
-        if not GameTooltip then return end
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(L.TARGET_TOOLTIP_TITLE)
-        GameTooltip:AddLine(L.TARGET_TOOLTIP_BODY, 1, 1, 1, true)
-        GameTooltip:Show()
-    end)
-    b:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
-
-    -- The secure snippet needs a secure handler "header" to run from.
-    header = CreateFrame("Frame", nil, UIParent, "SecureHandlerBaseTemplate")
-    SecureHandlerWrapScript(b, "OnClick", header, PRE_CLICK)
-
-    restorePosition(b)
-    b:Hide()
-    return b
-end
-
---- One extra button for a single creature, stacked under the previous one.
-local function createExtra(i)
-    local anchor = i == 1 and button or extras[i - 1]
-    local b = CreateFrame("Button", FRAME_NAME .. (i + 1), UIParent, "SecureActionButtonTemplate,UIPanelButtonTemplate")
-    b:SetSize(220, 22)
-    b:SetAttribute("type", "macro")
-    b:SetAttribute("macrotext", "")
-    b:SetPoint("TOP", anchor, "BOTTOM", 0, -2)
     b:EnableMouse(true)
     b:RegisterForDrag("LeftButton")
-    -- Shift + left-drag on any of them moves the whole stack.
+
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    b.border = b:CreateTexture(nil, "BACKGROUND")
+    b.border:SetPoint("TOPLEFT", -2, 2)
+    b.border:SetPoint("BOTTOMRIGHT", 2, -2)
+    b.border:SetColorTexture(0, 0, 0, 0.8)
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    b.count:SetPoint("BOTTOMRIGHT", -2, 2)
+    b.label = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.label:SetPoint("TOP", b, "BOTTOM", 0, -1)
+    b.label:SetWidth(ICON_SIZE + ICON_GAP + 8)
+    b.label:SetWordWrap(false)
+
+    if i == 1 then
+        b:SetMovable(true)
+        b:SetClampedToScreen(true)
+        restorePosition(b)
+    else
+        local prev = i == 2 and button or extras[i - 2]
+        b:SetPoint("LEFT", prev, "RIGHT", ICON_GAP, 0)
+    end
+    -- Shift + left-drag on any of them moves the whole row.
     b:SetScript("OnDragStart", function()
         if IsShiftKeyDown() and not ns.GameApi.InCombat() then button:StartMoving() end
     end)
@@ -237,63 +379,72 @@ local function createExtra(i)
         button:StopMovingOrSizing()
         savePosition(button)
     end)
+    b:SetScript("OnEnter", showTooltip)
+    b:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+    b:HookScript("PostClick", onPostClick)
+
+    if not header then header = CreateFrame("Frame", nil, UIParent, "SecureHandlerBaseTemplate") end
+    SecureHandlerWrapScript(b, "OnClick", header, PRE_CLICK)
     b:Hide()
     return b
 end
 
---- Show one extra button for each creature after the first.
-local function applyExtras(names, useDown)
-    for i = 1, MAX_EXTRA do
-        local name = #names > 1 and names[i + 1] or nil
-        local b = extras[i]
-        if name and not b then
-            b = createExtra(i)
-            extras[i] = b
-        end
-        if b then
-            if name then
-                b:SetAttribute("macrotext", "/targetexact " .. name)
-                b:RegisterForClicks(useDown and "AnyDown" or "AnyUp")
-                b:SetText(L.TARGET_FMT:format(name))
-                b:Show()
-            else
-                b:SetAttribute("macrotext", "")
-                b:Hide()
-            end
-        end
+--- Store one group's creatures on a button.
+local function fill(b, group, useDown, progress)
+    local oldCount = b:GetAttribute("fp-count") or 0
+    local names = group and group.names or {}
+    for k = 1, math.max(oldCount, #names) do b:SetAttribute("fp-name" .. k, names[k]) end
+    b:SetAttribute("fp-count", #names)
+    b:SetAttribute("fp-index", 0) -- next press: the nearest again
+    b:SetAttribute("fp-usedown", useDown)
+    b:SetAttribute("macrotext", names[1] and ("/targetexact " .. names[1]) or "")
+    b.group, b.progress = group, progress
+    if group then
+        b.icon:SetTexture(group.icon)
+        b.count:SetText(#names > 1 and tostring(#names) or "")
+        b.label:SetText(group.label)
+        b:Show()
+    else
+        b:Hide()
     end
 end
 
---- Store a creature list on the button (out of combat only).
-local function apply(names)
+--- The current step's objective texts ("Vile Familiar slain: 2/8").
+local function progressOf(state)
+    local out = {}
+    local step = state and state.steps and state.steps[1]
+    for _, questID in ipairs(step and step.questIDs or {}) do
+        for _, o in ipairs(ns.GameApi.GetObjectives(questID)) do out[#out + 1] = o.text end
+    end
+    return out
+end
+
+--- Store a creature list on the buttons (out of combat only).
+local function apply(names, progress)
     if ns.GameApi.InCombat() then
-        pendingList = names
+        pendingList = { names = names, progress = progress }
         return
     end
     pendingList = nil
-    if not button then button = create() end
+    if not button then button = createIcon(1) end
     if not ns.Settings.account.targetButton then names = {} end
 
     local key = table.concat(names, "\n")
-    if key == appliedKey then return end
-    appliedKey = key
-
-    local oldCount = button:GetAttribute("fp-count") or 0
-    for i = 1, math.max(oldCount, #names) do
-        button:SetAttribute("fp-name" .. i, names[i])
+    if key == appliedKey then
+        button.progress = progress
+        for _, b in ipairs(extras) do b.progress = progress end
+        return
     end
-    local useDown = GetCVarBool and GetCVarBool("ActionButtonUseKeyDown") or false
-    button:SetAttribute("fp-count", #names)
-    button:SetAttribute("fp-index", 0) -- next press: the nearest again
-    button:SetAttribute("fp-usedown", useDown)
-    button:SetAttribute("macrotext", names[1] and ("/targetexact " .. names[1]) or "")
-    applyExtras(names, useDown)
+    appliedKey = key
+    lastNames = names
 
-    if #names > 0 then
-        updateLabel(button)
-        button:Show()
-    else
-        button:Hide()
+    local groups = TargetButton.Group(names)
+    local useDown = GetCVarBool and GetCVarBool("ActionButtonUseKeyDown") or false
+    fill(button, groups[1], useDown, progress)
+    for i = 1, MAX_EXTRA do
+        local group = groups[i + 1]
+        if group and not extras[i] then extras[i] = createIcon(i + 1) end
+        if extras[i] then fill(extras[i], group, useDown, progress) end
     end
 end
 
@@ -301,7 +452,7 @@ end
 -- @param state Engine.state (uses .steps[1] and .log)
 -- @param origin player's world position
 function TargetButton.Update(state, origin)
-    apply(TargetButton.BuildList(state.steps and state.steps[1], state.log or {}, origin))
+    apply(TargetButton.BuildList(state.steps and state.steps[1], state.log or {}, origin), progressOf(state))
 end
 
 --- Why the button is or isn't showing, for /qw debug.
@@ -327,7 +478,7 @@ end
 
 --- Apply a list chosen during combat.
 function TargetButton.OnCombatEnded()
-    if pendingList then apply(pendingList) end
+    if pendingList then apply(pendingList.names, pendingList.progress) end
 end
 
 function TargetButton.SetEnabled(enabled)
@@ -340,21 +491,29 @@ function TargetButton.ResetPosition()
     if button and not ns.GameApi.InCombat() then restorePosition(button) end
 end
 
---- For tests: the creature names stored on the button, in order.
+--- For tests: every creature on the buttons, nearest first.
 function TargetButton.GetNames()
     local names = {}
-    if not button then return names end
-    for i = 1, button:GetAttribute("fp-count") or 0 do
-        names[i] = button:GetAttribute("fp-name" .. i)
-    end
+    for i, name in ipairs(lastNames or {}) do names[i] = name end
     return names
+end
+
+--- For tests: the groups on show, as "Label: name, name".
+function TargetButton.GetGroups()
+    local out = {}
+    for _, b in ipairs({ button, unpack(extras) }) do
+        if b and b:IsShown() and b.group then
+            out[#out + 1] = b.group.label .. ": " .. table.concat(b.group.names, ", ")
+        end
+    end
+    return out
 end
 
 function TargetButton.GetMacro()
     return button and button:GetAttribute("macrotext")
 end
 
---- For tests: the extra per-creature buttons that are showing.
+--- For tests: the extra group buttons that are showing.
 function TargetButton.GetExtraButtons()
     local out = {}
     for _, b in ipairs(extras) do

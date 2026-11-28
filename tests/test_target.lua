@@ -40,13 +40,10 @@ return {
         end
     end },
 
-    { "right-click moves to the next kind, then wraps around", function(T)
-        local _, mock, button = setup(T)
-        T.eq(mock.click(button)[1], target("Near Scorpid"))
-        T.eq(mock.click(button, "RightButton")[1], target("Vile Familiar"))
-        T.eq(mock.click(button)[1], target("Vile Familiar"), "left keeps the new kind")
-        T.eq(mock.click(button, "RightButton")[1], target("Distant Boar"))
-        T.eq(mock.click(button, "RightButton")[1], target("Near Scorpid"), "back to the nearest")
+    { "different kinds get an icon each, nearest first", function(T)
+        local ns = setup(T)
+        T.eq(table.concat(ns.TargetButton.GetGroups(), " | "),
+            "Near Scorpid: Near Scorpid | Vile Familiar: Vile Familiar | Distant Boar: Distant Boar")
     end },
 
     { "one press = one step, whichever key-down setting you use", function(T)
@@ -61,13 +58,11 @@ return {
         T.eq(ran[1], target("Near Scorpid"))
     end },
 
-    { "the label shows what the next press targets", function(T)
-        local _, mock, button = setup(T)
-        T.eq(button:GetText(), "Target: Near Scorpid (1/3)")
-        mock.click(button)
-        T.eq(button:GetText(), "Target: Near Scorpid (1/3)", "left: same kind")
-        mock.click(button, "RightButton")
-        T.eq(button:GetText(), "Target: Vile Familiar (2/3)")
+    { "a short label and an icon under each button", function(T)
+        local _, _, button = setup(T)
+        T.eq(button.label:GetText(), "Near Scorpid")
+        T.eq(button.icon:GetTexture(), "Interface\\Icons\\Ability_Hunter_Pet_Scorpid")
+        T.eq(button.count:GetText(), "", "one kind: no count")
     end },
 
     { "Shift-click doesn't target (Shift is for dragging)", function(T)
@@ -99,7 +94,7 @@ return {
         local _, mock, button = setup(T)
         mock.inCombat = true
         T.eq(mock.click(button)[1], target("Near Scorpid"))
-        T.eq(mock.click(button, "RightButton")[1], target("Vile Familiar"))
+        T.eq(mock.click(button)[1], target("Near Scorpid"))
     end },
 
     { "a new list starts again from the nearest", function(T)
@@ -130,15 +125,37 @@ return {
         T.truthy(not button:IsShown())
     end },
 
-    { "several creatures: one extra button each, under the main one", function(T)
-        local ns, mock, button = setup(T)
+    { "several kinds: one extra icon each, in a row", function(T)
+        local ns, mock = setup(T)
         local extras = ns.TargetButton.GetExtraButtons()
-        T.eq(#extras, 2, "three creatures: main button plus two")
+        T.eq(#extras, 2, "three kinds: main button plus two")
         T.eq(extras[1]:GetAttribute("macrotext"), "/targetexact Vile Familiar")
-        T.eq(extras[2]:GetAttribute("macrotext"), "/targetexact Distant Boar")
-        T.contains(extras[1]:GetText(), "Vile Familiar")
-        T.eq(button:GetAttribute("fp-count"), 3, "the main button still cycles through all")
-        T.eq(mock.click(button)[1], target("Near Scorpid"))
+        T.eq(mock.click(extras[2])[1], target("Distant Boar"))
+    end },
+
+    { "creatures of one kind share an icon; right-click goes through the kinds", function(T)
+        local ns, mock = T.fresh()
+        local db = fixtures.durotar(mock)
+        db.Npc[2002] = { name = "Forest Spider", spawns = { [14] = { { 52, 50 } } } }
+        db.Npc[2003] = { name = "Venom Web Spider", spawns = { [14] = { { 53, 50 } } } }
+        db.Npc[2005] = { name = "Defias Trapper", spawns = { [14] = { { 60, 50 } } } }
+        db.Npc[2006] = { name = "Defias Smuggler", spawns = { [14] = { { 61, 50 } } } }
+        db.Quest[101].objectives = { { { 2002 }, { 2003 }, { 2005 }, { 2006 } } }
+        fixtures.addToLog(mock, 101, "Webs and Bandits", false, {
+            "Forest Spider slain: 0/5", "Venom Web Spider slain: 0/5",
+            "Defias Trapper slain: 0/5", "Defias Smuggler slain: 0/5" })
+        fixtures.login(ns)
+        QuestwalkerCharDB.guide.trainedLevel = 60
+        ns.Engine.FocusQuest(101)
+        T.eq(table.concat(ns.TargetButton.GetGroups(), " | "),
+            "Spiders: Forest Spider, Venom Web Spider | Defias: Defias Trapper, Defias Smuggler")
+        local button = QuestwalkerTargetButton
+        T.eq(button.icon:GetTexture(), "Interface\\Icons\\Spell_Nature_Web")
+        T.eq(button.count:GetText(), "2")
+        T.eq(mock.click(button)[1], target("Forest Spider"))
+        T.eq(mock.click(button)[1], target("Forest Spider"), "again: the next Forest Spider")
+        T.eq(mock.click(button, "RightButton")[1], target("Venom Web Spider"))
+        T.eq(mock.click(button, "RightButton")[1], target("Forest Spider"), "wraps round")
     end },
 
     { "extra buttons go when the creatures do, and wait out combat", function(T)
@@ -161,5 +178,15 @@ return {
         mock.printed = {}
         SlashCmdList.QUESTWALKER("debug")
         T.contains(table.concat(mock.printed, "\n"), "hidden: the current step is ACCEPT")
+    end },
+
+    { "grouping: describing words don't make a kind", function(T)
+        local ns = T.fresh()
+        local groups = ns.TargetButton.Group({ "Young Wolf", "Young Boar", "Mottled Boar", "Gray Wolf" })
+        local labels = {}
+        for _, g in ipairs(groups) do labels[#labels + 1] = g.label .. "=" .. #g.names end
+        T.eq(table.concat(labels, ","), "Wolves=2,Boars=2")
+        T.eq(groups[1].icon, "Interface\\Icons\\Ability_Hunter_Pet_Wolf")
+        T.eq(ns.TargetButton.IconFor("Kurzen Commando"), "Interface\\Icons\\Ability_Hunter_SniperShot")
     end },
 }
