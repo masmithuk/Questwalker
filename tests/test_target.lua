@@ -33,14 +33,20 @@ return {
         T.eq(table.concat(names, ","), "Near Scorpid,Vile Familiar,Distant Boar")
     end },
 
-    { "each press steps to the next creature, then wraps around", function(T)
+    { "pressing again repeats the nearest kind, so the game steps through each one", function(T)
         local _, mock, button = setup(T)
-        local order = {}
-        for i = 1, 4 do order[i] = mock.click(button)[1] end
-        T.eq(order[1], target("Near Scorpid"))
-        T.eq(order[2], target("Vile Familiar"))
-        T.eq(order[3], target("Distant Boar"))
-        T.eq(order[4], target("Near Scorpid"), "back to the nearest")
+        for _ = 1, 3 do
+            T.eq(mock.click(button)[1], target("Near Scorpid"), "same name each press")
+        end
+    end },
+
+    { "right-click moves to the next kind, then wraps around", function(T)
+        local _, mock, button = setup(T)
+        T.eq(mock.click(button)[1], target("Near Scorpid"))
+        T.eq(mock.click(button, "RightButton")[1], target("Vile Familiar"))
+        T.eq(mock.click(button)[1], target("Vile Familiar"), "left keeps the new kind")
+        T.eq(mock.click(button, "RightButton")[1], target("Distant Boar"))
+        T.eq(mock.click(button, "RightButton")[1], target("Near Scorpid"), "back to the nearest")
     end },
 
     { "one press = one step, whichever key-down setting you use", function(T)
@@ -59,6 +65,8 @@ return {
         local _, mock, button = setup(T)
         T.eq(button:GetText(), "Target: Near Scorpid (1/3)")
         mock.click(button)
+        T.eq(button:GetText(), "Target: Near Scorpid (1/3)", "left: same kind")
+        mock.click(button, "RightButton")
         T.eq(button:GetText(), "Target: Vile Familiar (2/3)")
     end },
 
@@ -91,7 +99,7 @@ return {
         local _, mock, button = setup(T)
         mock.inCombat = true
         T.eq(mock.click(button)[1], target("Near Scorpid"))
-        T.eq(mock.click(button)[1], target("Vile Familiar"))
+        T.eq(mock.click(button, "RightButton")[1], target("Vile Familiar"))
     end },
 
     { "a new list starts again from the nearest", function(T)

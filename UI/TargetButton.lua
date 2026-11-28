@@ -1,8 +1,16 @@
 --[[
     Questwalker - UI/TargetButton.lua
 
-    "Target" button: each press targets the next quest creature, from the
-    nearest to the furthest, then starts again at the nearest.
+    "Target" button: each press targets a quest creature near you, starting
+    with the nearest. Pressing again moves to the next one of that kind
+    (the game rotates through creatures with the same name, as /target
+    does). Right-click (or its own key binding) switches to the next kind
+    of creature, nearest kind first.
+
+    Why not one rotation through every kind? The game's targeting commands
+    that rotate through units don't take a name, and those that take a name
+    only rotate through units with that name. Repeating the same name is
+    what lets the game step through the creatures around you.
 
     Why it's built this way
       * Addons may not call TargetUnit; targeting has to come from a
@@ -66,7 +74,13 @@ local PRE_CLICK = [[
     end
     local count = self:GetAttribute("fp-count") or 0
     if count == 0 then return false end
-    local index = (self:GetAttribute("fp-index") or 0) % count + 1
+    local index = self:GetAttribute("fp-index") or 0
+    if index == 0 then
+        index = 1 -- first press: the nearest kind
+    elseif button == "RightButton" then
+        index = index % count + 1 -- the next kind of creature
+    end
+    -- Left presses repeat the name, so the game steps through each creature of that kind.
     self:SetAttribute("fp-index", index)
     self:SetAttribute("macrotext", "/targetexact " .. self:GetAttribute("fp-name" .. index))
 ]]
@@ -150,11 +164,12 @@ local function restorePosition(f)
     f:SetPoint(saved.point, UIParent, saved.relativePoint, saved.x, saved.y)
 end
 
---- "Target: Vile Familiar (2/4)" for the creature the next press targets.
+--- "Target: Vile Familiar (2/4)" for the kind of creature presses target.
 local function updateLabel(b)
     local count = b:GetAttribute("fp-count") or 0
     if count == 0 then return end
-    local index = (b:GetAttribute("fp-index") or 0) % count + 1
+    local index = b:GetAttribute("fp-index") or 0
+    if index == 0 then index = 1 end
     local name = b:GetAttribute("fp-name" .. index)
     if count > 1 then
         b:SetText(L.TARGET_CYCLE_FMT:format(name, index, count))

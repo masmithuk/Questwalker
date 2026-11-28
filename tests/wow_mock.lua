@@ -449,24 +449,25 @@ end
 -- Returns the macro that would run, or nil if the snippet cancelled it.
 ---------------------------------------------------------------------------
 
-function mock.press(frame, down)
+function mock.press(frame, down, mouseButton)
+    mouseButton = mouseButton or "LeftButton"
     local body = rawget(frame, "wrapped") and rawget(frame, "wrapped").OnClick
     if body then
         local fn = assert(loadstring("local self, button, down = ...\n" .. body))
         setfenv(fn, { IsShiftKeyDown = function() return mock.keys.shift end })
-        if fn(frame, "LeftButton", down) == false then return nil end
+        if fn(frame, mouseButton, down) == false then return nil end
     end
     local macro = frame:GetAttribute("macrotext")
     local hooks = rawget(frame, "hooks")
-    if hooks and hooks.PostClick then hooks.PostClick(frame, "LeftButton", down) end
+    if hooks and hooks.PostClick then hooks.PostClick(frame, mouseButton, down) end
     return macro
 end
 
 --- A full mouse click: down then up. Returns the macros that ran.
-function mock.click(frame)
+function mock.click(frame, mouseButton)
     local ran = {}
     for _, down in ipairs({ true, false }) do
-        local macro = mock.press(frame, down)
+        local macro = mock.press(frame, down, mouseButton)
         if macro then ran[#ran + 1] = macro end
     end
     return ran

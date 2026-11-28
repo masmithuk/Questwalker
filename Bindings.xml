@@ -1,11 +1,14 @@
 <!--
-    Key bindings for the Target button (cycles through every creature) and
+    Key bindings for the Target button (left: the nearest quest creature,
+    again for the next one of that kind; right: the next kind) and
     the extra per-creature buttons (2nd to 6th creature). It appears under
     Options > Keybindings > AddOns > Questwalker. The binding "clicks" the
     secure button, which is what lets it change your target.
 -->
 <Bindings>
     <Binding name="CLICK QuestwalkerTargetButton:LeftButton" header="QUESTWALKER" category="ADDONS">
+    </Binding>
+    <Binding name="CLICK QuestwalkerTargetButton:RightButton" category="ADDONS">
     </Binding>
     <Binding name="CLICK QuestwalkerTargetButton2:LeftButton" category="ADDONS">
     </Binding>

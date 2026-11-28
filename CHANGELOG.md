@@ -2,6 +2,11 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.12] - 2026-11-28
+
+### Changed
+- **The Target button steps through the creatures around you.** Click to target the nearest creature you need; click again to move to the next one of that kind nearby, and so on. Before, each click jumped to a different kind of creature, so you never got past the first of each. Right-click (or the new "Target the next kind of quest mob" key binding) switches to the next kind, nearest kind first.
+
 ## [0.9.11] - 2026-11-28
 
 ### Fixed
