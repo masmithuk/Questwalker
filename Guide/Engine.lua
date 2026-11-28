@@ -438,6 +438,7 @@ function Engine.FocusQuest(questID)
     local char = charGuide()
     char.skipped[questID] = nil
     char.notOffered[questID] = nil
+    if char.notOfferedTimes then char.notOfferedTimes[questID] = nil end
     char.focus = questID
     char.focusStep = nil
     invalidateDoable()
@@ -562,11 +563,31 @@ function Engine.AbandonUnrelated()
     return n
 end
 
+--- After a level up, bring back quests that weren't offered, in case they
+--- needed the level. Each time a quest isn't offered, it waits a level
+--- longer before it's tried again (one level, then two); after
+--- Engine.NOT_OFFERED_TRIES times it stays off until you bring it back on
+--- the Steps screen, so you aren't sent to a giver with nothing to give
+--- every level.
+Engine.NOT_OFFERED_TRIES = 3
+function Engine.RecheckNotOffered(level)
+    local char = charGuide()
+    level = tonumber(level) or ns.Character.Detect().level
+    local times = char.notOfferedTimes or {}
+    for id, noted in pairs(char.notOffered) do
+        local tries = times[id] or 1
+        if tries < Engine.NOT_OFFERED_TRIES and level >= (tonumber(noted) or 0) + tries then
+            char.notOffered[id] = nil
+        end
+    end
+end
+
 function Engine.UnskipAll()
     local char = charGuide()
     char.skipped = {}
     char.skippedSteps = {}
     char.notOffered = {}
+    char.notOfferedTimes = {}
     -- Skips are all undone; keep only hand-ticked steps in the history.
     local kept = {}
     for _, e in ipairs(history()) do
@@ -652,8 +673,16 @@ function Engine.NoteOffered(npcID, offered)
     end
     if #missing == 0 then return missing end
     local level = ns.Character.Detect().level
-    for _, id in ipairs(missing) do char.notOffered[id] = level end
-    if #needs > 0 then
+    char.notOfferedTimes = char.notOfferedTimes or {}
+    local givenUp = {}
+    for i, id in ipairs(missing) do
+        char.notOffered[id] = level
+        char.notOfferedTimes[id] = (char.notOfferedTimes[id] or 0) + 1
+        if char.notOfferedTimes[id] >= Engine.NOT_OFFERED_TRIES then givenUp[#givenUp + 1] = names[i] end
+    end
+    if #givenUp > 0 then
+        ns.Util.Print(ns.L.NOT_OFFERED_GIVE_UP_FMT:format(table.concat(givenUp, ", ")))
+    elseif #needs > 0 then
         ns.Util.Print(ns.L.NOT_OFFERED_NEEDS_FMT:format(table.concat(names, ", "), table.concat(needs, "; ")))
     else
         ns.Util.Print(ns.L.NOT_OFFERED_FMT:format(table.concat(names, ", ")))
@@ -733,7 +762,7 @@ function Engine.Start()
         check(spent)
     end)
     -- A new level can make those quests available.
-    ns:RegisterEvent("PLAYER_LEVEL_UP", function() charGuide().notOffered = {} end)
+    ns:RegisterEvent("PLAYER_LEVEL_UP", function(_, level) Engine.RecheckNotOffered(level) end)
     ns:RegisterEvent("QUEST_TURNED_IN", function(_, questID)
         if ns.Util.SafeNumber(questID) then turnedInThisSession[questID] = true end
         invalidateDoable()

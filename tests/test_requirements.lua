@@ -130,4 +130,33 @@ return {
         T.contains(ns.StepsTab.StatusLabel({ status = "needs", needs = ctx.needsFirst[102].lines }),
             "Only during a holiday event")
     end },
+
+    { "not offered again and again: it waits longer each time, then stops", function(T)
+        local ns, mock = T.fresh()
+        fixtures.durotar(mock)
+        mock.player.level = 8
+        local state = fixtures.login(ns)
+        local g = QuestwalkerCharDB.guide
+        local function miss(level)
+            mock.player.level = level
+            state.steps = { { kind = "ACCEPT", actor = "npc:1001", questIDs = { 101 }, title = "Talk to Zureetha Fargaze" } }
+            ns.Engine.NoteOffered(1001, {})
+        end
+        miss(8)
+        T.eq(g.notOfferedTimes[101], 1)
+        ns:FireEvent("PLAYER_LEVEL_UP", 9)
+        T.eq(g.notOffered[101], nil, "first miss: tried again next level")
+        miss(9)
+        ns:FireEvent("PLAYER_LEVEL_UP", 10)
+        T.eq(g.notOffered[101], 9, "second miss: not yet")
+        ns:FireEvent("PLAYER_LEVEL_UP", 11)
+        T.eq(g.notOffered[101], nil, "two levels later")
+        miss(11)
+        T.contains(mock.printed[#mock.printed], "won't suggest it again")
+        for level = 12, 20 do ns:FireEvent("PLAYER_LEVEL_UP", level) end
+        T.eq(g.notOffered[101], 11, "third miss: stays off")
+        ns.Engine.FocusQuest(101)
+        T.eq(g.notOffered[101], nil, "picking it on the Steps screen brings it back")
+        T.eq(g.notOfferedTimes[101], nil)
+    end },
 }

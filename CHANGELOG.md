@@ -2,6 +2,11 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.14] - 2026-11-28
+
+### Fixed
+- **Quests that are never offered stop coming back.** A quest whose giver doesn't offer it used to be suggested again after every level up, in case it needed the level, so a quest like An Apple Treat sent you back each level. Now it waits a level after the first miss, two after the second, and after the third the guide stops suggesting it and says so. Pick it on the Steps screen (or `/qw unskip`) to try again.
+
 ## [0.9.13] - 2026-11-28
 
 ### Fixed
