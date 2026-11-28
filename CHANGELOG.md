@@ -2,6 +2,11 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.13] - 2026-11-28
+
+### Fixed
+- **"Set your hearthstone" when it's already set there.** The game names your hearthstone's place ("Goldshire"), but inside the inn the place is called something else ("Lion's Pride Inn"), so the guide thought you were bound somewhere else. It now knows you're bound at an inn when you set it there with Questwalker running, or when the bind's name matches any place name seen around that innkeeper.
+
 ## [0.9.12] - 2026-11-28
 
 ### Changed

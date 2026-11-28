@@ -884,6 +884,45 @@ end
 --- Set your hearthstone at the inn nearest to where you're questing -
 --- only while you're at that inn and it's bound somewhere else. (Another
 --- inn you pass on the way isn't suggested.)
+local INN_AREA = 80        -- yards: place names seen this close to an innkeeper are its town
+local BIND_NEAR = 150      -- yards: a recorded bind point this close to an inn is that inn
+
+--- Is your hearthstone already set at this innkeeper's inn? The game only
+--- gives the bind's place name ("Goldshire"), and inside the inn the place
+--- is called something else ("Lion's Pride Inn"), so this checks:
+---   - where you set it, when Questwalker saw you do it (the arrow keeps it)
+---   - the place names seen around this innkeeper (remembered as you pass)
+---   - the place you're standing in now
+function Sources.BoundAt(ctx, actor, point)
+    local bind = ns.GameApi.GetBindLocation()
+    local g = ctx.char
+    local bindPoint = g.bindPoint
+    if bindPoint and point.world then
+        local w = ns.GameApi.GetWorldPosition(bindPoint.mapID, bindPoint.x, bindPoint.y)
+        if w and w.continent == point.world.continent and ns.Util.Distance(w, point.world) <= BIND_NEAR then
+            return true
+        end
+    end
+    if not bind then return false end
+    -- Remember what the places around this inn are called.
+    g.innAreas = g.innAreas or {}
+    local names = g.innAreas[actor.id] or {}
+    g.innAreas[actor.id] = names
+    local here = ctx.origin and point.world and ctx.origin.continent == point.world.continent
+        and ns.Util.Distance(ctx.origin, point.world) <= INN_AREA
+    if here then
+        for _, name in ipairs({ ns.GameApi.GetZoneNames() }) do
+            if name and name ~= "" then names[name] = true end
+        end
+    end
+    if names[bind] then return true end
+    if here then
+        local zone, subzone, minimap = ns.GameApi.GetZoneNames()
+        if bind == zone or bind == subzone or bind == minimap then return true end
+    end
+    return false
+end
+
 local function hearthStep(ctx, out)
     if not ctx.origin then return end
     local centre = Sources.QuestingCentre(out, ctx.origin.continent)
@@ -892,9 +931,8 @@ local function hearthStep(ctx, out)
     local actor, point = nearestActor(centre, inns)
     if not actor or not point or not point.world then return end
     if ns.Util.Distance(ctx.origin, point.world) > ns.Data.Services.nearDistance then return end
+    if Sources.BoundAt(ctx, actor, point) then return end
     local bind = ns.GameApi.GetBindLocation()
-    local zone, subzone = ns.GameApi.GetZoneNames()
-    if bind and (bind == subzone or bind == zone) then return end
     local key = "hearth:npc:" .. actor.id
     if ctx.char.skippedSteps[key] then return end
     out[#out + 1] = serviceStep(key, "HEARTH", "Set your hearthstone at " .. actor.name,

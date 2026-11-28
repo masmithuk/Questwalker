@@ -324,6 +324,7 @@ function mock.install()
     _G.GetBindLocation = function() return mock.bindLocation end
     _G.GetZoneText = function() return mock.zone end
     _G.GetSubZoneText = function() return mock.subzone end
+    _G.GetMinimapZoneText = function() return mock.minimapZone or mock.subzone end
     -- The Classic skill list (header rows are skipped by the addon).
     _G.GetNumSkillLines = function() return #mock.skills + 1 end
     _G.GetSkillLineInfo = function(i)

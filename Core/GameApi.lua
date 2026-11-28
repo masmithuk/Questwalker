@@ -241,7 +241,8 @@ end
 
 --- The zone and subzone you're standing in.
 function GameApi.GetZoneNames()
-    return ns.Util.SafeString(safe(GetZoneText)), ns.Util.SafeString(safe(GetSubZoneText))
+    return ns.Util.SafeString(safe(GetZoneText)), ns.Util.SafeString(safe(GetSubZoneText)),
+        ns.Util.SafeString(safe(GetMinimapZoneText))
 end
 
 --- Professions you've learned: list of { name, skill, max }.

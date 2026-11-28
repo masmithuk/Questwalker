@@ -145,6 +145,43 @@ return {
         T.truthy(not hasKey(ns.Engine.state, "hearth:npc:3002"), "bound here - step gone")
     end },
 
+    { "already bound here, though the inn has another name inside", function(T)
+        local ns, mock = T.fresh()
+        local db = fixtures.durotar(mock)
+        db.Npc[3002] = { name = "Innkeeper Farley", subName = "Innkeeper", friendlyToFaction = "AH",
+                         spawns = { [14] = { { 49, 49 } } } }
+        mock.bindLocation = "Goldshire"
+        mock.subzone = "Goldshire" -- walking in
+        local state = fixtures.login(ns)
+        T.truthy(not hasKey(state, "hearth:npc:3002"), "outside: Goldshire matches")
+        mock.subzone = "Lion's Pride Inn" -- inside the inn
+        ns.Engine.Replan()
+        T.truthy(not hasKey(ns.Engine.state, "hearth:npc:3002"), "inside: still known to be Goldshire")
+    end },
+
+    { "bound where you set it, whatever the place is called", function(T)
+        local ns, mock = T.fresh()
+        local db = fixtures.durotar(mock)
+        db.Npc[3002] = { name = "Innkeeper Farley", subName = "Innkeeper", friendlyToFaction = "AH",
+                         spawns = { [14] = { { 49, 49 } } } }
+        mock.bindLocation = "Goldshire"
+        mock.subzone = "Lion's Pride Inn"
+        QuestwalkerCharDB.guide.bindPoint = { mapID = 1411, x = 0.492, y = 0.49 }
+        local state = fixtures.login(ns)
+        T.truthy(not hasKey(state, "hearth:npc:3002"))
+    end },
+
+    { "bound somewhere else: still asked", function(T)
+        local ns, mock = T.fresh()
+        local db = fixtures.durotar(mock)
+        db.Npc[3002] = { name = "Innkeeper Farley", subName = "Innkeeper", friendlyToFaction = "AH",
+                         spawns = { [14] = { { 49, 49 } } } }
+        mock.bindLocation = "Stormwind"
+        mock.subzone = "Lion's Pride Inn"
+        local state = fixtures.login(ns)
+        T.truthy(hasKey(state, "hearth:npc:3002"))
+    end },
+
     { "the hearthstone goes to the inn nearest your quests, not the one you're at", function(T)
         local ns, mock = T.fresh()
         local db = fixtures.durotar(mock)
